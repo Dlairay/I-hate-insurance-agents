@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Insurance Questionnaire - AI Insurance Broker</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="/static/css/style.css" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                <i class="fas fa-shield-alt me-2"></i>
+                AI Insurance Broker
+            </a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <!-- Header -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body text-center">
+                        <h1 class="display-6 text-primary mb-3">
+                            <i class="fas fa-clipboard-list me-2"></i>
+                            Insurance Questionnaire
+                        </h1>
+                        <p class="lead">Answer a few questions to get personalized insurance quotes from top providers</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Progress Bar -->
+        <div class="row mb-4" id="progress-section" style="display: none;">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-muted">Progress</span>
+                            <span class="badge bg-primary" id="progress-text">1 of 25</span>
+                        </div>
+                        <div class="progress" style="height: 8px;">
+                            <div class="progress-bar" role="progressbar" id="progress-bar" 
+                                 style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Welcome Screen -->
+        <div class="row" id="welcome-screen">
+            <div class="col-lg-8 mx-auto">
+                <div class="card border-0 shadow">
+                    <div class="card-body p-5">
+                        <div class="text-center mb-4">
+                            <i class="fas fa-handshake text-primary" style="font-size: 4rem;"></i>
+                        </div>
+                        <h2 class="text-center mb-4">Welcome to Your Personal Insurance Assistant</h2>
+                        <div class="row mb-4">
+                            <div class="col-md-4 text-center mb-3">
+                                <i class="fas fa-brain text-success mb-2" style="font-size: 2rem;"></i>
+                                <h5>AI-Powered</h5>
+                                <p class="text-muted small">Smart questionnaire that adapts to your responses</p>
+                            </div>
+                            <div class="col-md-4 text-center mb-3">
+                                <i class="fas fa-search text-info mb-2" style="font-size: 2rem;"></i>
+                                <h5>Multiple Quotes</h5>
+                                <p class="text-muted small">Compare options from top insurance companies</p>
+                            </div>
+                            <div class="col-md-4 text-center mb-3">
+                                <i class="fas fa-award text-warning mb-2" style="font-size: 2rem;"></i>
+                                <h5>Personalized</h5>
+                                <p class="text-muted small">Get recommendations tailored to your needs</p>
+                            </div>
+                        </div>
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>Need help?</strong> If you're unsure about any question, just describe your situation and our AI assistant will help you choose the right answer.
+                        </div>
+                        
+                        <!-- Profile Upload Option -->
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <div class="card border-primary">
+                                    <div class="card-body text-center">
+                                        <i class="fas fa-upload text-primary mb-2" style="font-size: 2rem;"></i>
+                                        <h5>Upload Profile</h5>
+                                        <p class="text-muted small">Skip basic info by uploading a JSON profile</p>
+                                        <input type="file" id="profile-upload" accept=".json" class="form-control mb-2" style="display: none;">
+                                        <button class="btn btn-outline-primary" id="choose-file-btn" onclick="document.getElementById('profile-upload').click()">
+                                            <i class="fas fa-file-upload me-1"></i> Choose File
+                                        </button>
+                                        <div id="upload-status" class="mt-2 small"></div>
+                                        <div id="file-name" class="mt-1 text-muted small"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card">
+                                    <div class="card-body text-center">
+                                        <i class="fas fa-comments text-success mb-2" style="font-size: 2rem;"></i>
+                                        <h5>Answer Questions</h5>
+                                        <p class="text-muted small">Complete the full questionnaire manually</p>
+                                        <button class="btn btn-primary" id="start-btn">
+                                            <i class="fas fa-play me-1"></i> Start Questionnaire
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Sample JSON format -->
+                        <div class="collapse" id="json-format">
+                            <div class="alert alert-secondary">
+                                <strong>Sample JSON format:</strong>
+                                <pre class="mt-2" style="font-size: 0.8rem;">{
+  "first_name": "John",
+  "last_name": "Doe", 
+  "dob": "1990-05-15",
+  "gender": "M",
+  "email": "john@example.com",
+  "phone": "555-1234",
+  "address_line1": "123 Main St",
+  "city": "San Francisco",
+  "state": "CA",
+  "postal_code": "94102"
+}</pre>
+                            </div>
+                        </div>
+                        
+                        <div class="text-center">
+                            <button class="btn btn-link btn-sm" data-bs-toggle="collapse" data-bs-target="#json-format">
+                                <i class="fas fa-code me-1"></i> Show JSON format
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Question Screen -->
+        <div class="row" id="question-screen" style="display: none;">
+            <div class="col-lg-8 mx-auto">
+                <div class="card border-0 shadow">
+                    <div class="card-body p-4">
+                        <!-- Question Header -->
+                        <div class="mb-4">
+                            <h3 id="question-text">Loading question...</h3>
+                            <p class="text-muted" id="question-help" style="display: none;"></p>
+                            <span class="badge bg-secondary" id="question-category"></span>
+                        </div>
+
+                        <!-- Question Content -->
+                        <div id="question-content">
+                            <!-- Options will be dynamically inserted here -->
+                        </div>
+
+                        <!-- Help Section -->
+                        <div class="card mt-4" id="help-section" style="display: none;">
+                            <div class="card-header bg-light">
+                                <h6 class="mb-0">
+                                    <i class="fas fa-robot me-2 text-primary"></i>
+                                    Need Help? Describe Your Situation
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <textarea class="form-control" id="help-description" rows="3" 
+                                              placeholder="Describe your situation in your own words..."></textarea>
+                                </div>
+                                <div class="d-flex gap-2">
+                                    <button class="btn btn-primary btn-sm" id="get-help-btn">
+                                        <i class="fas fa-magic me-1"></i>
+                                        Get AI Suggestion
+                                    </button>
+                                    <button class="btn btn-outline-secondary btn-sm" id="cancel-help-btn">
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- AI Suggestion -->
+                        <div class="alert alert-success" id="ai-suggestion" style="display: none;">
+                            <div class="d-flex align-items-start">
+                                <i class="fas fa-robot me-2 mt-1"></i>
+                                <div>
+                                    <strong>AI Suggestion:</strong>
+                                    <p class="mb-2" id="ai-suggestion-text"></p>
+                                    <p class="mb-0 small text-muted" id="ai-explanation"></p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Navigation -->
+                        <div class="d-flex justify-content-between align-items-center mt-4">
+                            <button class="btn btn-outline-secondary" id="need-help-btn">
+                                <i class="fas fa-question-circle me-1"></i>
+                                Need Help?
+                            </button>
+                            
+                            <div>
+                                <button class="btn btn-outline-primary me-2" id="back-btn" style="display: none;">
+                                    <i class="fas fa-arrow-left me-1"></i>
+                                    Back
+                                </button>
+                                <button class="btn btn-primary" id="next-btn" disabled>
+                                    <span id="next-btn-text">Next</span>
+                                    <i class="fas fa-arrow-right ms-1"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Screen -->
+        <div class="row" id="results-screen" style="display: none;">
+            <div class="col-12">
+                <!-- Loading State -->
+                <div class="card border-0 shadow text-center" id="loading-results" style="display: none;">
+                    <div class="card-body p-5">
+                        <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <h4>Finding Your Perfect Insurance Match</h4>
+                        <p class="text-muted">We're analyzing your responses and comparing quotes from multiple insurance companies...</p>
+                        <div class="progress mt-4" style="height: 8px;">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                 style="width: 100%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Results Content -->
+                <div id="results-content" style="display: none;">
+                    <!-- Header -->
+                    <div class="card border-0 shadow-sm mb-4">
+                        <div class="card-body text-center">
+                            <h2 class="text-success mb-3">
+                                <i class="fas fa-check-circle me-2"></i>
+                                Your Personalized Insurance Quotes
+                            </h2>
+                            <p class="lead">We found <span id="quotes-count">0</span> great options tailored to your needs</p>
+                        </div>
+                    </div>
+
+                    <!-- Insurance Cards -->
+                    <div id="insurance-cards">
+                        <!-- Cards will be dynamically inserted here -->
+                    </div>
+
+                    <!-- Recommendations -->
+                    <div class="card border-0 shadow-sm mt-4" id="recommendations-section">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0">
+                                <i class="fas fa-star me-2"></i>
+                                AI Recommendations
+                            </h5>
+                        </div>
+                        <div class="card-body" id="recommendations-content">
+                            <!-- Recommendations will be dynamically inserted here -->
+                        </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="text-center mt-4">
+                        <button class="btn btn-outline-primary me-2" id="start-over-btn">
+                            <i class="fas fa-redo me-1"></i>
+                            Start Over
+                        </button>
+                        <button class="btn btn-success" id="contact-agent-btn">
+                            <i class="fas fa-phone me-1"></i>
+                            Contact an Agent
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Custom JS -->
+    <script src="/static/js/questionnaire.js"></script>
+</body>
+</html>

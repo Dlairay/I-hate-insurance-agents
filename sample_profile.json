@@ -1,0 +1,12 @@
+{
+  "first_name": "Sarah",
+  "last_name": "Johnson",
+  "dob": "1988-03-15",
+  "gender": "F",
+  "email": "sarah.johnson@email.com",
+  "phone": "555-0123",
+  "address_line1": "456 Oak Avenue",
+  "city": "San Francisco",
+  "state": "CA",
+  "postal_code": "94105"
+}
