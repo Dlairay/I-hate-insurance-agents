@@ -4,7 +4,7 @@ questionnaire/server.py
 Questionnaire server that runs on port 8001
 """
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, File, UploadFile
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -19,12 +19,16 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 from shared.models import (
     QuestionnaireSession, QuestionnaireResponse, 
-    ApplicantProfile, InsuranceRequest, ProductType
+    ApplicantProfile, InsuranceRequest, ProductType,
+    UserProfile, ExistingPolicyAssessment, NeedsEvaluationSchema, PolicyScore
 )
 from questionnaire.questions import INSURANCE_QUESTIONS, should_show_question
 from agents.questionnaire_agent import QuestionnaireHelper
 from agents.response_parser_agent import ResponseParser
 from agents.recommendation_agent import RecommendationEngine
+from agents.pdf_parser_agent import get_pdf_parser, PDFExtractionResult
+from agents.policy_analyzer_agent import analyze_existing_policy
+from agents.needs_evaluation_agent import get_needs_evaluation_agent
 
 app = FastAPI(
     title="Insurance Questionnaire Server",
@@ -52,6 +56,17 @@ else:
 
 # In-memory storage for sessions (in production, use database)
 sessions: Dict[str, QuestionnaireSession] = {}
+
+# Import database models for persistence
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+
+from backend.database import (
+    async_db, Collections, QuestionnaireSessionRecord, 
+    PDFExtractionRecord, PolicyScoreRecord
+)
+import hashlib
 
 # AI agents will be initialized lazily
 questionnaire_helper = None
@@ -167,6 +182,134 @@ async def start_session_with_profile(profile_data: Dict[str, Any]):
         "progress": {"current": 1, "total": total_insurance_questions}
     }
 
+@app.post("/api/start-session-with-pdf")
+async def start_session_with_pdf(
+    pdf_file: UploadFile = File(...),
+    json_profile: Optional[str] = None
+):
+    """Start questionnaire session with PDF document and optional JSON profile"""
+    
+    # Validate PDF file
+    if not pdf_file.filename.lower().endswith('.pdf'):
+        raise HTTPException(status_code=400, detail="File must be a PDF")
+    
+    # Read PDF content
+    pdf_content = await pdf_file.read()
+    
+    # Parse JSON profile if provided
+    profile_data = {}
+    if json_profile:
+        try:
+            profile_data = json.loads(json_profile)
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail="Invalid JSON profile data")
+    
+    # Extract information from PDF
+    pdf_parser = get_pdf_parser()
+    extraction_result = pdf_parser.extract_insurance_fields(pdf_content, profile_data)
+    
+    # Create session
+    session_id = str(uuid.uuid4())
+    
+    # Save PDF extraction results to database
+    extraction_id = await save_pdf_extraction(
+        session_id, pdf_file.filename, pdf_content, extraction_result
+    )
+    session = QuestionnaireSession(session_id=session_id)
+    
+    # Store extraction result in session metadata
+    session.metadata = {
+        "pdf_extraction": extraction_result.dict(),
+        "pdf_filename": pdf_file.filename
+    }
+    
+    # Pre-fill questions based on extracted data
+    extracted_fields = extraction_result.extracted_fields
+    
+    # Map extracted fields to questions
+    field_mappings = [
+        ("personal_first_name", "first_name"),
+        ("personal_last_name", "last_name"), 
+        ("personal_dob", "dob"),
+        ("personal_gender", "gender"),
+        ("personal_email", "email"),
+        ("personal_phone", "phone"),
+        ("address_line1", "address_line1"),
+        ("address_city", "city"),
+        ("address_state", "state"),
+        ("address_postal_code", "postal_code"),
+        ("annual_income", "annual_income"),
+    ]
+    
+    for question_id, field_key in field_mappings:
+        if field_key in extracted_fields:
+            response = QuestionnaireResponse(
+                question_id=question_id,
+                answer=extracted_fields[field_key],
+                needs_help=False
+            )
+            session.responses.append(response)
+    
+    # Find first unanswered question
+    answered_question_ids = {resp.question_id for resp in session.responses}
+    first_unanswered_index = 0
+    
+    for i, question in enumerate(INSURANCE_QUESTIONS):
+        if question.id not in answered_question_ids:
+            first_unanswered_index = i
+            break
+    
+    session.current_question_index = first_unanswered_index
+    sessions[session_id] = session
+    
+    # Get the first unanswered question
+    current_question = INSURANCE_QUESTIONS[first_unanswered_index] if first_unanswered_index < len(INSURANCE_QUESTIONS) else None
+    
+    # Calculate progress
+    total_questions = len(INSURANCE_QUESTIONS)
+    current_progress = len(session.responses) + 1
+    
+    response_data = {
+        "session_id": session_id,
+        "pdf_extraction_result": extraction_result.dict(),
+        "current_question": current_question.dict() if current_question else None,
+        "progress": {"current": current_progress, "total": total_questions},
+        "pre_filled_fields": list(extracted_fields.keys())
+    }
+    
+    return response_data
+
+@app.post("/api/parse-pdf")
+async def parse_pdf_only(
+    pdf_file: UploadFile = File(...),
+    json_profile: Optional[str] = None
+):
+    """Parse PDF and return extracted fields without starting a session"""
+    
+    # Validate PDF file
+    if not pdf_file.filename.lower().endswith('.pdf'):
+        raise HTTPException(status_code=400, detail="File must be a PDF")
+    
+    # Read PDF content
+    pdf_content = await pdf_file.read()
+    
+    # Parse JSON profile if provided
+    profile_data = {}
+    if json_profile:
+        try:
+            profile_data = json.loads(json_profile)
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail="Invalid JSON profile data")
+    
+    # Extract information from PDF
+    pdf_parser = get_pdf_parser()
+    extraction_result = pdf_parser.extract_insurance_fields(pdf_content, profile_data)
+    
+    return {
+        "extraction_result": extraction_result.dict(),
+        "filename": pdf_file.filename
+    }
+
 @app.get("/api/session/{session_id}")
 async def get_session(session_id: str):
     """Get current session state"""
@@ -222,8 +365,14 @@ async def submit_answer(session_id: str, answer_data: Dict[str, Any]):
     
     # Update session
     session.responses.append(response)
+    
+    # NEW: Direct schema population as user answers
+    populate_user_profile_field(session, current_question.id, response.answer)
+    
     session.current_question_index += 1
     session.updated_at = datetime.utcnow()
+    
+    print(f"Schema update: {current_question.id} = {response.answer}")  # Debug
     
     # Move to next appropriate question (skip conditional questions)
     while (session.current_question_index < len(INSURANCE_QUESTIONS) and 
@@ -237,9 +386,9 @@ async def submit_answer(session_id: str, answer_data: Dict[str, Any]):
     if session.current_question_index >= len(INSURANCE_QUESTIONS):
         session.completed = True
         
-        # Process completed questionnaire
+        # Process completed questionnaire with agentic approach
         try:
-            insurance_response = await process_completed_questionnaire(session)
+            insurance_response = await process_completed_questionnaire_agentic(session)
             return {
                 "completed": True,
                 "insurance_response": insurance_response,
@@ -347,9 +496,179 @@ def get_response_dict(session: QuestionnaireSession) -> Dict[str, Any]:
     """Convert session responses to dictionary for easy lookup"""
     return {r.question_id: r.answer for r in session.responses}
 
+async def save_completed_session(session: QuestionnaireSession, applicant: ApplicantProfile, 
+                                 source: str = "manual", pdf_info: Optional[Dict] = None):
+    """Save completed questionnaire session to MongoDB"""
+    try:
+        # Create session record
+        session_record = QuestionnaireSessionRecord(
+            session_id=session.session_id,
+            applicant_profile=applicant.dict(),
+            source=source,
+            pdf_filename=pdf_info.get("filename") if pdf_info else None,
+            pdf_extraction_confidence=pdf_info.get("confidence_score") if pdf_info else None
+        )
+        
+        # Insert into MongoDB
+        await async_db[Collections.QUESTIONNAIRE_SESSIONS].insert_one(
+            session_record.dict(exclude={"id"})
+        )
+        
+        print(f"✅ Saved questionnaire session {session.session_id} to database")
+        
+    except Exception as e:
+        print(f"⚠️ Failed to save session to database: {e}")
+        # Don't fail the entire process if saving fails
+
+async def save_pdf_extraction(session_id: str, pdf_filename: str, pdf_content: bytes,
+                             extraction_result) -> str:
+    """Save PDF extraction results to MongoDB"""
+    try:
+        # Generate extraction ID and file hash
+        extraction_id = str(uuid.uuid4())
+        file_hash = hashlib.md5(pdf_content).hexdigest()
+        
+        # Create extraction record
+        extraction_record = PDFExtractionRecord(
+            extraction_id=extraction_id,
+            session_id=session_id,
+            filename=pdf_filename,
+            file_size_bytes=len(pdf_content),
+            file_hash=file_hash,
+            extracted_fields=extraction_result.extracted_fields,
+            confidence_score=extraction_result.confidence_score,
+            processing_time_seconds=extraction_result.processing_time_seconds,
+            missing_required_fields=extraction_result.missing_fields,
+            warnings=extraction_result.warnings,
+            extraction_method="gemini" if extraction_result.confidence_score > 50 else "fallback"
+        )
+        
+        # Insert into MongoDB
+        await async_db[Collections.PDF_EXTRACTIONS].insert_one(
+            extraction_record.dict(exclude={"id"})
+        )
+        
+        print(f"✅ Saved PDF extraction {extraction_id} to database")
+        return extraction_id
+        
+    except Exception as e:
+        print(f"⚠️ Failed to save PDF extraction: {e}")
+        return ""
+
+async def save_policy_scores(session_id: str, scored_plans, user_income: float):
+    """Save policy scoring results to MongoDB for analytics"""
+    try:
+        for score in scored_plans:
+            score_record = PolicyScoreRecord(
+                score_id=str(uuid.uuid4()),
+                session_id=session_id,
+                plan_id=score.plan_id,
+                overall_score=score.overall_score,
+                affordability_score=score.affordability_score,
+                ease_of_claims_score=score.ease_of_claims_score,
+                coverage_ratio_score=score.coverage_ratio_score,
+                user_annual_income=user_income,
+                income_percentage=score.income_percentage,
+                company_name=score.company_name,
+                plan_name=score.plan_name,
+                monthly_premium=0,  # Extract from plan data
+                coverage_amount=0,  # Extract from plan data
+                scoring_weights={"affordability": 0.4, "ease_of_claims": 0.25, "coverage_ratio": 0.35}
+            )
+            
+            await async_db[Collections.POLICY_SCORES].insert_one(
+                score_record.dict(exclude={"id"})
+            )
+        
+        print(f"✅ Saved {len(scored_plans)} policy scores to database")
+        
+    except Exception as e:
+        print(f"⚠️ Failed to save policy scores: {e}")
+
 async def process_completed_questionnaire(session: QuestionnaireSession) -> Dict[str, Any]:
-    """Process completed questionnaire and get insurance quotes"""
+    """Process completed questionnaire and get insurance quotes with policy analysis"""
     responses = get_response_dict(session)
+    
+    # For MVP: Handle simplified 8-question format
+    if is_mvp_questionnaire(responses):
+        return await process_mvp_questionnaire(responses)
+    
+    # Legacy: Handle original 25-question format
+    return await process_legacy_questionnaire(responses)
+
+async def process_mvp_questionnaire(responses: Dict[str, Any]) -> Dict[str, Any]:
+    """Process the simplified 8-question MVP questionnaire"""
+    
+    # Parse MVP responses
+    basic_info = responses.get("basic_info", "")
+    existing_coverage = responses.get("existing_coverage", "none")
+    coverage_amount = responses.get("current_coverage_amount", "none")
+    health_status = responses.get("health_status", "good")
+    primary_need = responses.get("primary_need", "first_time")
+    budget = responses.get("budget", "show_all")
+    coverage_priority = responses.get("coverage_priority", "health_medical")
+    timeline = responses.get("timeline", "exploring")
+    
+    # Parse basic info (age and income)
+    age, annual_income = parse_basic_info(basic_info)
+    
+    # First: Analyze existing policy if any
+    policy_analysis = None
+    if existing_coverage != "none":
+        # Estimate current premium based on coverage type and budget
+        estimated_premium = estimate_current_premium(existing_coverage, budget, annual_income)
+        
+        policy_analysis = analyze_existing_policy(
+            existing_coverage=existing_coverage,
+            coverage_amount=coverage_amount,
+            monthly_premium=estimated_premium,
+            annual_income=annual_income,
+            age=age,
+            health_status=health_status,
+            primary_need=primary_need
+        )
+    
+    # Create minimal applicant profile for API
+    applicant = create_minimal_applicant(age, annual_income, health_status)
+    
+    # Determine if user needs new coverage or optimization
+    should_get_quotes = should_fetch_new_quotes(policy_analysis, primary_need, existing_coverage)
+    
+    result = {
+        "existing_policy_analysis": policy_analysis.dict() if policy_analysis else None,
+        "recommendations": generate_mvp_recommendations(policy_analysis, primary_need, timeline)
+    }
+    
+    # Only get new quotes if analysis suggests it's beneficial
+    if should_get_quotes:
+        # Determine coverage needs
+        product_type = map_coverage_priority_to_product_type(coverage_priority)
+        target_coverage = calculate_needed_coverage(age, annual_income, existing_coverage, coverage_amount)
+        
+        # Create insurance request
+        insurance_request = InsuranceRequest(
+            product_type=product_type,
+            applicant=applicant,
+            coverage_amount=target_coverage,
+            deductible=None,
+            term_years=None,
+            riders=[],
+            beneficiaries=[]
+        )
+        
+        # Get quotes
+        try:
+            quotes_data = await fetch_insurance_quotes(insurance_request, responses)
+            result["new_quotes"] = quotes_data
+        except Exception as e:
+            result["quotes_error"] = f"Error fetching quotes: {str(e)}"
+    else:
+        result["quotes_skipped"] = "Analysis suggests no new coverage needed"
+    
+    return result
+
+async def process_legacy_questionnaire(responses: Dict[str, Any]) -> Dict[str, Any]:
+    """Process the original detailed questionnaire (25 questions)"""
     
     # Convert responses to ApplicantProfile
     try:
@@ -372,47 +691,464 @@ async def process_completed_questionnaire(session: QuestionnaireSession) -> Dict
         beneficiaries=[]
     )
     
-    # Send request to insurance API
+    # Get quotes
     try:
-        import httpx
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                "http://localhost:8000/v1/quote",
-                json=insurance_request.dict(),
-                timeout=30.0
-            )
-            response.raise_for_status()
-            raw_insurance_response = response.json()
+        quotes_data = await fetch_insurance_quotes(insurance_request, responses)
+        return {"new_quotes": quotes_data}
     except Exception as e:
         raise Exception(f"Error calling insurance API: {str(e)}")
+
+async def fetch_insurance_quotes(insurance_request: InsuranceRequest, responses: Dict[str, Any]) -> Dict[str, Any]:
+    """Fetch quotes from insurance API"""
+    import httpx
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            "http://localhost:8000/v1/quote",
+            json=insurance_request.dict(),
+            timeout=30.0
+        )
+        response.raise_for_status()
+        raw_insurance_response = response.json()
     
     # Parse response with AI agent
     try:
         parsed_cards = await get_response_parser().parse_insurance_response(
-            raw_insurance_response,
-            responses  # Pass user preferences for context
+            raw_insurance_response, responses
         )
     except Exception as e:
-        print(f"Error parsing insurance response: {e}")
-        parsed_cards = []  # Fallback to empty list
+        print(f"Response parser error: {e}")
+        parsed_cards = create_fallback_cards(raw_insurance_response)
     
     # Generate recommendations
     try:
         recommendations = await get_recommendation_engine().generate_recommendations(
-            parsed_cards,
-            responses,
-            applicant
+            parsed_cards, insurance_request.applicant
         )
     except Exception as e:
-        print(f"Error generating recommendations: {e}")
-        recommendations = []  # Fallback to empty list
+        print(f"Recommendation engine error: {e}")
+        recommendations = create_fallback_recommendations(parsed_cards)
     
     return {
-        "raw_response": raw_insurance_response,
-        "insurance_cards": parsed_cards,
-        "recommendations": recommendations,
-        "session_id": session.session_id
+        "quotes": raw_insurance_response,
+        "parsed_cards": parsed_cards,
+        "recommendations": recommendations
     }
+
+# MVP Helper Functions
+def is_mvp_questionnaire(responses: Dict[str, Any]) -> bool:
+    """Detect if this is the simplified 8-question MVP questionnaire"""
+    mvp_question_ids = {
+        "basic_info", "existing_coverage", "current_coverage_amount", 
+        "health_status", "primary_need", "budget", "coverage_priority", "timeline"
+    }
+    
+    # Check if we have MVP questions and don't have legacy questions
+    has_mvp_questions = any(qid in responses for qid in mvp_question_ids)
+    has_legacy_questions = any(qid.startswith("personal_") for qid in responses.keys())
+    
+    return has_mvp_questions and not has_legacy_questions
+
+def parse_basic_info(basic_info: str) -> tuple[int, float]:
+    """Parse age and income from combined basic info response"""
+    import re
+    
+    # Default values
+    age = 30
+    annual_income = 50000.0
+    
+    # Try to extract age and income with regex
+    numbers = re.findall(r'\d+', basic_info.replace(',', ''))
+    
+    if len(numbers) >= 2:
+        # Assume first smaller number is age, larger is income
+        nums = [int(n) for n in numbers]
+        nums.sort()
+        
+        if nums[0] <= 100:  # Reasonable age range
+            age = nums[0]
+        if nums[-1] >= 1000:  # Reasonable income range
+            annual_income = float(nums[-1])
+    
+    return age, annual_income
+
+def estimate_current_premium(coverage_type: str, budget: str, annual_income: float) -> float:
+    """Estimate current premium based on coverage type and budget indication"""
+    
+    # Base estimates by coverage type (monthly)
+    base_estimates = {
+        "employer_only": annual_income * 0.02 / 12,          # 2% of income
+        "employer_comprehensive": annual_income * 0.04 / 12,  # 4% of income
+        "individual_basic": annual_income * 0.03 / 12,       # 3% of income
+        "individual_comprehensive": annual_income * 0.05 / 12, # 5% of income
+        "parents": 50  # Minimal amount
+    }
+    
+    base_premium = base_estimates.get(coverage_type, annual_income * 0.03 / 12)
+    
+    # Adjust based on budget indication
+    if budget == "under_100":
+        return min(base_premium, 90)
+    elif budget == "100_200":
+        return min(base_premium, 180)
+    elif budget == "200_400":
+        return min(base_premium, 380)
+    
+    return base_premium
+
+def create_minimal_applicant(age: int, annual_income: float, health_status: str) -> ApplicantProfile:
+    """Create minimal applicant profile for API call"""
+    from datetime import date
+    
+    # Calculate birth year
+    current_year = date.today().year
+    birth_year = current_year - age
+    
+    # Map health status to smoker status (rough heuristic)
+    smoker = health_status == "poor"  # Very rough mapping
+    
+    return ApplicantProfile(
+        first_name="User",
+        last_name="Person", 
+        dob=f"{birth_year}-01-01",
+        gender="OTHER",
+        email="user@example.com",
+        phone="000-000-0000",
+        address_line1="123 Main St",
+        city="Anytown",
+        state="CA",
+        postal_code="12345",
+        annual_income=annual_income,
+        smoker=smoker
+    )
+
+def should_fetch_new_quotes(policy_analysis, primary_need: str, existing_coverage: str) -> bool:
+    """Determine if we should fetch new insurance quotes"""
+    
+    # Always get quotes if no existing coverage
+    if existing_coverage == "none":
+        return True
+    
+    # Check user's primary need
+    if primary_need in ["save_money", "fill_gaps", "compare_options"]:
+        return True
+    
+    # If analysis suggests action needed
+    if policy_analysis:
+        if policy_analysis.primary_recommendation in ["add_supplemental", "switch_provider", "get_new_coverage"]:
+            return True
+        if policy_analysis.can_save_money and policy_analysis.potential_monthly_savings > 20:
+            return True
+    
+    return False
+
+def generate_mvp_recommendations(policy_analysis, primary_need: str, timeline: str) -> List[str]:
+    """Generate recommendations based on policy analysis"""
+    recommendations = []
+    
+    if not policy_analysis:
+        # No existing coverage
+        recommendations.extend([
+            "Start with basic health insurance to avoid medical debt",
+            "Consider term life insurance if you have dependents",
+            "Critical illness coverage is important for young adults"
+        ])
+    else:
+        # Has existing coverage - use analysis
+        if policy_analysis.primary_recommendation == "no_action_needed":
+            recommendations.append("Your current coverage looks good - no immediate action needed")
+        else:
+            recommendations.append(policy_analysis.recommendation_reason)
+            recommendations.extend(policy_analysis.specific_actions[:3])  # Top 3 actions
+    
+    # Add timeline-specific advice
+    if timeline == "immediately":
+        recommendations.insert(0, "⚠️ Coverage gap detected - prioritize immediate coverage")
+    elif timeline == "exploring":
+        recommendations.append("💡 Take time to compare options - no rush needed")
+    
+    return recommendations
+
+def map_coverage_priority_to_product_type(coverage_priority: str) -> ProductType:
+    """Map user's coverage priority to insurance product type"""
+    mapping = {
+        "health_medical": ProductType.HEALTH_BASIC,
+        "life_protection": ProductType.LIFE_TERM,
+        "critical_illness": ProductType.CRITICAL_ILLNESS,
+        "comprehensive_all": ProductType.HEALTH_PREMIUM,
+        "unsure": ProductType.HEALTH_BASIC
+    }
+    return mapping.get(coverage_priority, ProductType.HEALTH_BASIC)
+
+def calculate_needed_coverage(age: int, annual_income: float, existing_coverage: str, coverage_amount: str) -> float:
+    """Calculate how much coverage the user needs"""
+    
+    # Base coverage recommendation (10x income for life, 2x for health)
+    base_health_coverage = annual_income * 2
+    base_life_coverage = annual_income * 10
+    
+    # Adjust for age
+    if age < 30:
+        base_coverage = max(base_health_coverage, 100000)
+    elif age < 50:
+        base_coverage = max(base_life_coverage, 200000) 
+    else:
+        base_coverage = max(base_life_coverage * 0.8, 150000)
+    
+    # Subtract existing coverage to find gap
+    existing_amounts = {
+        "none": 0,
+        "under_50k": 25000,
+        "50k_100k": 75000, 
+        "100k_250k": 175000,
+        "250k_500k": 375000,
+        "over_500k": 750000
+    }
+    
+    existing_amount = existing_amounts.get(coverage_amount, 0)
+    needed_coverage = max(base_coverage - existing_amount, 50000)  # Minimum 50k
+    
+    return needed_coverage
+
+def create_fallback_cards(raw_response: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Create basic cards when AI parser fails"""
+    quotes = raw_response.get("quotes", [])
+    cards = []
+    
+    for quote in quotes[:3]:  # Top 3
+        card = {
+            "company_name": quote.get("company_name", "Insurance Company"),
+            "plan_name": quote.get("product_name", "Insurance Plan"),
+            "monthly_cost": f"${quote.get('total_monthly_premium', 0):.0f}/month",
+            "coverage_amount": f"${quote.get('coverage_amount', 0):,.0f}",
+            "key_benefits": ["Medical coverage", "Healthcare benefits"],
+            "value_score": 75,
+            "recommended": len(cards) == 0  # First card is recommended
+        }
+        cards.append(card)
+    
+    return cards
+
+def create_fallback_recommendations(cards: List[Dict[str, Any]]) -> List[str]:
+    """Create basic recommendations when AI engine fails"""
+    if not cards:
+        return ["No suitable plans found - please adjust your criteria"]
+    
+    return [
+        f"Consider {cards[0]['company_name']} for the best value",
+        "Compare coverage details carefully", 
+        "Check provider networks in your area"
+    ]
+
+# NEW: Direct Schema Population Functions
+
+def populate_user_profile_field(session: QuestionnaireSession, question_id: str, answer_value: Any):
+    """Directly populate UserProfile schema as user answers questions"""
+    
+    # Parse basic_info if it's the combined field
+    if question_id == "basic_info" and isinstance(answer_value, str):
+        age, income = parse_basic_info_direct(answer_value)
+        session.user_profile.age = age
+        session.user_profile.annual_income = income
+        return
+    
+    # Direct field mappings for MVP questionnaire
+    field_mappings = {
+        "existing_coverage": "existing_coverage_type",
+        "current_coverage_amount": "existing_coverage_amount", 
+        "health_status": "health_status",
+        "primary_need": "primary_need",
+        "budget": "monthly_budget",
+        "coverage_priority": "coverage_priority", 
+        "timeline": "urgency"
+    }
+    
+    if question_id in field_mappings:
+        profile_field = field_mappings[question_id]
+        setattr(session.user_profile, profile_field, answer_value)
+
+def parse_basic_info_direct(basic_info: str) -> tuple[int, float]:
+    """Parse age and income from basic_info text"""
+    import re
+    
+    # Default values
+    age = 30
+    annual_income = 50000.0
+    
+    # Extract numbers
+    numbers = re.findall(r'\d+', basic_info.replace(',', ''))
+    
+    if len(numbers) >= 2:
+        nums = [int(n) for n in numbers]
+        nums.sort()
+        
+        # Assume smaller number is age, larger is income
+        if nums[0] <= 100:  # Reasonable age
+            age = nums[0]
+        if nums[-1] >= 1000:  # Reasonable income
+            annual_income = float(nums[-1])
+    elif len(numbers) == 1:
+        num = int(numbers[0])
+        if num <= 100:
+            age = num
+        elif num >= 1000:
+            annual_income = float(num)
+    
+    return age, annual_income
+
+async def process_completed_questionnaire_agentic(session: QuestionnaireSession) -> Dict[str, Any]:
+    """Process questionnaire with agents - schema is already populated!"""
+    
+    # Schema is already populated from direct mapping - no transformation needed!
+    user_profile = session.user_profile
+    
+    print(f"Processing with populated profile: {user_profile.dict()}")
+    
+    # 1. AGENT: Analyze existing policy if user has coverage
+    existing_policy_analysis = None
+    if user_profile.existing_coverage_type != "none":
+        try:
+            # Use existing policy analyzer (convert to schema format)
+            estimated_premium = estimate_premium_from_budget(user_profile.monthly_budget, user_profile.annual_income)
+            
+            old_analysis = analyze_existing_policy(
+                existing_coverage=user_profile.existing_coverage_type,
+                coverage_amount=user_profile.existing_coverage_amount,
+                monthly_premium=estimated_premium,
+                annual_income=user_profile.annual_income,
+                age=user_profile.age,
+                health_status=user_profile.health_status,
+                primary_need=user_profile.primary_need
+            )
+            
+            # Convert to new schema format
+            existing_policy_analysis = ExistingPolicyAssessment(
+                coverage_adequacy=map_coverage_adequacy(old_analysis.coverage_status),
+                monthly_cost_assessment="reasonable",
+                coverage_gaps=old_analysis.uncovered_risks,
+                over_coverage_areas=old_analysis.over_coverage_areas,
+                primary_action=map_recommendation_to_action(old_analysis.primary_recommendation),
+                potential_monthly_savings=old_analysis.potential_monthly_savings,
+                confidence_score=80,
+                analysis_reasoning=old_analysis.recommendation_reason,
+                specific_actions=old_analysis.specific_actions
+            )
+        except Exception as e:
+            print(f"Existing policy analysis failed: {e}")
+    
+    # 2. AGENT: Evaluate needs and determine next steps
+    try:
+        needs_agent = get_needs_evaluation_agent()
+        needs_analysis = await needs_agent.evaluate_insurance_needs(
+            user_profile, existing_policy_analysis
+        )
+    except Exception as e:
+        print(f"Needs evaluation failed: {e}")
+        needs_analysis = create_fallback_needs_analysis(user_profile)
+    
+    result = {
+        "user_profile": user_profile.dict(),
+        "existing_policy_analysis": existing_policy_analysis.dict() if existing_policy_analysis else None,
+        "needs_analysis": needs_analysis.dict(),
+        "scored_policies": []
+    }
+    
+    # 3. Conditional: Get quotes only if analysis suggests it
+    if needs_analysis.should_get_quotes:
+        try:
+            # Convert to API format
+            applicant_data = user_profile.to_applicant_data()
+            
+            # Determine coverage amount and product type
+            coverage_amount = needs_analysis.recommended_coverage_amount
+            product_type_mapping = {
+                "HEALTH_BASIC": ProductType.HEALTH_BASIC,
+                "HEALTH_PREMIUM": ProductType.HEALTH_PREMIUM, 
+                "LIFE_TERM": ProductType.LIFE_TERM,
+                "CRITICAL_ILLNESS": ProductType.CRITICAL_ILLNESS
+            }
+            product_type = product_type_mapping.get(needs_analysis.priority_product_type, ProductType.HEALTH_BASIC)
+            
+            # Create insurance request
+            insurance_request = InsuranceRequest(
+                product_type=product_type,
+                applicant=applicant_data,
+                coverage_amount=coverage_amount,
+                deductible=None,
+                term_years=None,
+                riders=[],
+                beneficiaries=[]
+            )
+            
+            # Get quotes
+            quotes_data = await fetch_insurance_quotes_simple(insurance_request)
+            result["new_quotes"] = quotes_data
+            
+        except Exception as e:
+            print(f"Quote fetching failed: {e}")
+            result["quotes_error"] = f"Error fetching quotes: {str(e)}"
+    else:
+        result["quotes_skipped"] = needs_analysis.reasoning
+    
+    return result
+
+def estimate_premium_from_budget(budget_range: str, annual_income: float) -> float:
+    """Estimate current premium from budget indication"""
+    budget_mapping = {
+        "under_100": 80,
+        "100_200": 150,
+        "200_400": 300,
+        "400_plus": 500,
+        "show_all": annual_income * 0.03 / 12  # 3% of income default
+    }
+    return budget_mapping.get(budget_range, 150)
+
+def map_coverage_adequacy(old_status) -> str:
+    """Map old coverage status to new schema"""
+    mapping = {
+        "over_insured": "over_insured",
+        "adequately_insured": "adequately_insured", 
+        "under_insured": "under_insured",
+        "no_coverage": "no_coverage"
+    }
+    return mapping.get(str(old_status), "adequately_insured")
+
+def map_recommendation_to_action(old_recommendation) -> str:
+    """Map old recommendation to new action"""
+    mapping = {
+        "no_action_needed": "no_action",
+        "reduce_coverage": "reduce_coverage",
+        "add_supplemental": "add_supplemental", 
+        "switch_provider": "switch_provider",
+        "get_new_coverage": "get_new_coverage"
+    }
+    return mapping.get(str(old_recommendation), "no_action")
+
+def create_fallback_needs_analysis(user_profile: UserProfile) -> NeedsEvaluationSchema:
+    """Create fallback when needs agent fails"""
+    return NeedsEvaluationSchema(
+        should_get_quotes=user_profile.existing_coverage_type == "none",
+        reasoning="Basic assessment based on your profile",
+        recommended_coverage_amount=max(user_profile.annual_income * 5, 100000),
+        priority_product_type="HEALTH_BASIC",
+        urgency_level="can_wait",
+        main_recommendation="Consider basic insurance coverage",
+        action_items=["Review your needs", "Compare options", "Make informed decision"]
+    )
+
+async def fetch_insurance_quotes_simple(insurance_request: InsuranceRequest) -> Dict[str, Any]:
+    """Simplified quote fetching"""
+    import httpx
+    
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            "http://localhost:8000/v1/quote",
+            json=insurance_request.dict(),
+            timeout=30.0
+        )
+        response.raise_for_status()
+        return response.json()
+
+# End of new agentic functions
 
 async def provide_general_insurance_guidance(user_description: str) -> Dict[str, str]:
     """Provide general insurance guidance based on user's description"""
@@ -564,19 +1300,17 @@ def determine_product_type(responses: Dict[str, Any]) -> ProductType:
             return ProductType.LIFE_TERM
 
 def convert_responses_to_applicant(responses: Dict[str, Any]) -> ApplicantProfile:
-    """Convert conversational questionnaire responses to technical ApplicantProfile"""
+    """Convert conversational questionnaire responses to enhanced ApplicantProfile"""
     
-    # Translate conversational smoking habits to technical format
-    smoking_response = responses.get("smoking_habits", "never")
+    # Handle both old and new smoking fields for backward compatibility
+    smoking_response = responses.get("smoking_vaping_habits", responses.get("smoking_habits", "never"))
     smoker = None
-    if smoking_response == "regular":
+    if smoking_response in ["regular", "heavy"]:
         smoker = True
-    elif smoking_response in ["never", "quit"]:
+    elif smoking_response in ["never", "quit_over_year"]:
         smoker = False
-    elif smoking_response == "recent_quit":
-        smoker = True  # Recent quitters often still rated as smokers
-    elif smoking_response == "occasional":
-        smoker = True  # Occasional smoking still counts
+    elif smoking_response in ["quit_under_year", "occasional", "social"]:
+        smoker = True  # Recent quitters and occasional users still rated as smokers
     
     # Translate health conditions from conversational to medical terms
     health_response = responses.get("health_conditions", "none")
@@ -644,7 +1378,15 @@ def convert_responses_to_applicant(responses: Dict[str, Any]) -> ApplicantProfil
     else:
         travel_frequency = "domestic"
     
+    # Use actual annual income if provided, otherwise estimate
+    actual_income = responses.get("annual_income")
+    if actual_income and isinstance(actual_income, (int, float)) and actual_income > 0:
+        annual_income = float(actual_income)
+    else:
+        annual_income = estimated_income
+    
     return ApplicantProfile(
+        # Personal Information
         first_name=responses.get("personal_first_name", ""),
         last_name=responses.get("personal_last_name", ""),
         dob=responses.get("personal_dob", "1990-01-01"),
@@ -652,6 +1394,7 @@ def convert_responses_to_applicant(responses: Dict[str, Any]) -> ApplicantProfil
         email=responses.get("personal_email", ""),
         phone=responses.get("personal_phone", ""),
         
+        # Address
         address_line1=responses.get("address_line1", ""),
         address_line2=None,
         city=responses.get("address_city", ""),
@@ -659,21 +1402,138 @@ def convert_responses_to_applicant(responses: Dict[str, Any]) -> ApplicantProfil
         postal_code=responses.get("address_postal_code", ""),
         country="US",
         
+        # Financial Information
+        annual_income=annual_income,
+        occupation=occupation,
+        
+        # Health Information (enhanced)
         smoker=smoker,
+        smoking_vaping_habits=smoking_response,
         height_cm=base_height,
         weight_kg=base_weight * weight_modifier,
-        occupation=occupation,
-        annual_income=estimated_income,
         
+        # Medical History
         pre_existing_conditions=pre_existing_conditions,
         medications=[],  # Will be inferred from health conditions
         hospitalizations_last_5_years=0 if health_overall in ["excellent", "good"] else 1,
         family_medical_history=[],  # Not asked in conversational format
         
-        exercise_frequency="weekly" if health_overall in ["excellent", "good"] else "monthly",
-        alcohol_consumption="social",  # Default assumption
-        travel_frequency=travel_frequency
+        # Lifestyle Risk Factors (Phase 1)
+        alcohol_consumption=responses.get("alcohol_consumption", "social"),
+        exercise_frequency=responses.get("exercise_habits", "weekly" if health_overall in ["excellent", "good"] else "monthly"),
+        dietary_habits=responses.get("dietary_habits"),
+        high_risk_activities=responses.get("high_risk_activities", []),
+        travel_frequency=travel_frequency,
+        
+        # Coverage Gaps & Transition Status (Phase 2)
+        current_coverage_status=responses.get("current_coverage_status"),
+        parents_policy_end_date=responses.get("parents_policy_end_date"),
+        employer_coverage_expectation=responses.get("employer_coverage_expectation"),
+        hospital_preference=responses.get("hospital_preference"),
+        special_coverage_needs=responses.get("special_coverage_needs", []),
+        
+        # Preferences & Budget (Phase 3)
+        coverage_vs_premium_priority=responses.get("coverage_vs_premium_priority"),
+        desired_add_ons=responses.get("desired_add_ons", []),
+        monthly_premium_budget=responses.get("monthly_premium_budget"),
+        deductible_copay_preference=responses.get("deductible_copay_preference")
     )
+
+@app.post("/api/upload-policy")
+async def upload_policy_document(
+    policy_file: UploadFile = File(...)
+):
+    """
+    Upload and analyze existing insurance policy documents
+    Returns policy analysis without starting questionnaire session
+    """
+    try:
+        # Validate file type
+        allowed_types = ['.pdf', '.jpg', '.jpeg', '.png']
+        file_ext = os.path.splitext(policy_file.filename)[1].lower()
+        if file_ext not in allowed_types:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"File type {file_ext} not supported. Please upload PDF, JPG, PNG, or JPEG files."
+            )
+        
+        # Read file content
+        file_content = await policy_file.read()
+        
+        print(f"📄 Processing policy document: {policy_file.filename} ({len(file_content)} bytes)")
+        
+        # Extract policy information using PDF parser
+        extraction_result = None
+        if file_ext == '.pdf':
+            try:
+                pdf_parser = get_pdf_parser()
+                extraction_result = await pdf_parser.extract_pdf_fields(file_content, policy_file.filename)
+            except Exception as e:
+                print(f"PDF parsing failed: {e}")
+                # Continue with fallback analysis
+        
+        # Create basic policy data for analysis
+        extracted_data = {}
+        if extraction_result and extraction_result.extracted_fields:
+            extracted_data = extraction_result.extracted_fields
+        
+        # Analyze the existing policy using policy analyzer agent
+        try:
+            analysis = await analyze_existing_policy(
+                coverage_type=extracted_data.get('coverage_type', 'unknown'),
+                coverage_amount=float(extracted_data.get('coverage_amount', 0)) if extracted_data.get('coverage_amount') else 0,
+                monthly_premium=float(extracted_data.get('monthly_premium', 0)) if extracted_data.get('monthly_premium') else 0,
+                annual_income=float(extracted_data.get('annual_income', 75000)),  # Default estimate
+                age=int(extracted_data.get('age', 35)),  # Default estimate
+                health_status=extracted_data.get('health_status', 'good'),
+                primary_need='analyze_existing'
+            )
+        except Exception as e:
+            print(f"Policy analysis failed: {e}")
+            # Create fallback analysis
+            analysis = ExistingPolicyAssessment(
+                coverage_adequacy="unknown",
+                monthly_cost_assessment="reasonable",
+                coverage_gaps=["Unable to fully analyze document"],
+                over_coverage_areas=[],
+                primary_action="get_new_coverage" if extracted_data else "continue_current",
+                potential_monthly_savings=0.0,
+                confidence_score=30,
+                analysis_reasoning="Document processed but detailed analysis unavailable. Consider getting quotes to compare your options.",
+                specific_actions=[
+                    "Get quotes from multiple providers",
+                    "Compare coverage amounts and features",
+                    "Review your current policy details",
+                    "Consider your changing needs"
+                ]
+            )
+        
+        # Return analysis results
+        response = {
+            "success": True,
+            "filename": policy_file.filename,
+            "extracted_fields": extracted_data,
+            "extraction_confidence": extraction_result.confidence_score if extraction_result else 0.3,
+            "existing_policy_analysis": analysis.dict(),
+            "recommendation": {
+                "should_get_quotes": analysis.primary_action in ['get_new_coverage', 'switch_provider', 'add_supplemental'],
+                "priority": "high" if analysis.primary_action == 'get_new_coverage' else "medium",
+                "message": analysis.analysis_reasoning
+            }
+        }
+        
+        print(f"✅ Policy analysis complete: {analysis.primary_action} (confidence: {analysis.confidence_score}%)")
+        return response
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Policy upload error: {e}")
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Failed to process policy document: {str(e)}"
+        )
+
 
 if __name__ == "__main__":
     import uvicorn

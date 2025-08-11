@@ -36,6 +36,9 @@ class Collections:
     CLAIMS = "claims"
     CUSTOMERS = "customers"
     RATE_TABLES = "rate_tables"
+    QUESTIONNAIRE_SESSIONS = "questionnaire_sessions"  # Store completed questionnaires
+    PDF_EXTRACTIONS = "pdf_extractions"  # Store PDF processing results
+    POLICY_SCORES = "policy_scores"  # Store scoring results
 
 
 # Helper class for ObjectId handling
@@ -225,6 +228,79 @@ class Policy(MongoBaseModel):
     
     # Documents
     documents: List[Dict[str, str]] = []
+
+
+class QuestionnaireSessionRecord(MongoBaseModel):
+    """Completed questionnaire session stored in database"""
+    session_id: str = Field(..., unique=True)
+    user_id: Optional[str] = None
+    
+    # Questionnaire responses mapped to profile fields
+    applicant_profile: Dict[str, Any]
+    
+    # Session metadata
+    completion_date: datetime = Field(default_factory=datetime.utcnow)
+    questionnaire_version: str = "3-phase-v1"
+    source: str  # "manual", "json_upload", "pdf_upload"
+    
+    # PDF processing info (if applicable)
+    pdf_filename: Optional[str] = None
+    pdf_extraction_confidence: Optional[float] = None
+    
+    # Generated quotes and scores
+    quote_request_id: Optional[str] = None
+    policy_scores: List[Dict[str, Any]] = []
+
+
+class PDFExtractionRecord(MongoBaseModel):
+    """PDF document processing results"""
+    extraction_id: str = Field(..., unique=True)
+    session_id: str
+    
+    # File info
+    filename: str
+    file_size_bytes: int
+    file_hash: str  # For duplicate detection
+    
+    # Extraction results
+    extracted_fields: Dict[str, Any]
+    confidence_score: float
+    processing_time_seconds: float
+    
+    # Quality metrics
+    missing_required_fields: List[str]
+    warnings: List[str]
+    
+    # AI model info
+    extraction_method: str  # "gemini", "fallback"
+    model_version: Optional[str] = None
+
+
+class PolicyScoreRecord(MongoBaseModel):
+    """Policy scoring results for analytics"""
+    score_id: str = Field(..., unique=True)
+    session_id: str
+    plan_id: str
+    
+    # Scores
+    overall_score: float
+    affordability_score: float
+    ease_of_claims_score: float
+    coverage_ratio_score: float
+    
+    # User context
+    user_annual_income: float
+    income_percentage: float
+    
+    # Plan details for analysis
+    company_name: str
+    plan_name: str
+    monthly_premium: float
+    coverage_amount: float
+    
+    # Scoring metadata
+    scoring_version: str = "v1"
+    scoring_weights: Dict[str, float]
 
 
 class Claim(MongoBaseModel):

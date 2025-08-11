@@ -1,285 +1,140 @@
 """
 questionnaire/questions.py
 ==========================
-Conversational insurance questionnaire for first-time buyers
+MVP Insurance Questionnaire - Simplified to 8 essential questions
 """
 
 from shared.models import Question, QuestionOption, QuestionType
 
-# Conversational Insurance Questionnaire for First-Time Buyers
+# MVP Simplified Questionnaire - 8 Essential Questions
 INSURANCE_QUESTIONS = [
-    # Personal Information (can be skipped with JSON upload)
+    # Question 1: Basic Identity (Combined name/DOB/income for quick profile)
     Question(
-        id="personal_first_name",
-        question_text="What's your first name?",
+        id="basic_info",
+        question_text="Let's start with the basics - what's your age and annual income?",
         question_type=QuestionType.TEXT,
         required=True,
-        category="personal"
+        help_text="Format: Age (e.g., 28) and Income (e.g., 75000). This helps calculate affordability.",
+        category="essential"
     ),
     
+    # Question 2: Existing Coverage (Critical for gap analysis)
     Question(
-        id="personal_last_name", 
-        question_text="And your last name?",
-        question_type=QuestionType.TEXT,
-        required=True,
-        category="personal"
-    ),
-    
-    Question(
-        id="personal_dob",
-        question_text="When were you born?",
-        question_type=QuestionType.DATE,
-        required=True,
-        help_text="This helps us find age-appropriate coverage options",
-        category="personal"
-    ),
-    
-    Question(
-        id="personal_gender",
-        question_text="Gender (for insurance rates)?",
+        id="existing_coverage",
+        question_text="What insurance do you currently have?",
         question_type=QuestionType.MCQ_SINGLE,
         options=[
-            QuestionOption(value="M", label="Male"),
-            QuestionOption(value="F", label="Female"),
-            QuestionOption(value="OTHER", label="Prefer not to say")
+            QuestionOption(value="none", label="No insurance - I need coverage"),
+            QuestionOption(value="employer_only", label="Basic employer insurance only"),
+            QuestionOption(value="employer_comprehensive", label="Comprehensive employer coverage"),
+            QuestionOption(value="individual_basic", label="Individual policy - basic coverage"),
+            QuestionOption(value="individual_comprehensive", label="Individual policy - comprehensive"),
+            QuestionOption(value="parents", label="Still on parents' policy (ending soon)")
         ],
         required=True,
-        category="personal"
+        help_text="We'll analyze if you need supplemental coverage or can save money",
+        category="essential"
     ),
     
+    # Question 3: Coverage Amount if Existing (For gap analysis)
     Question(
-        id="personal_email",
-        question_text="What's your email address?",
-        question_type=QuestionType.TEXT,
-        required=True,
-        category="personal"
-    ),
-    
-    Question(
-        id="personal_phone",
-        question_text="And your phone number?",
-        question_type=QuestionType.TEXT,
-        required=True,
-        category="personal"
-    ),
-
-    # Address
-    Question(
-        id="address_line1",
-        question_text="What's your home address?",
-        question_type=QuestionType.TEXT,
-        required=True,
-        category="address"
-    ),
-    
-    Question(
-        id="address_city",
-        question_text="Which city?",
-        question_type=QuestionType.TEXT,
-        required=True,
-        category="address"
-    ),
-    
-    Question(
-        id="address_state", 
-        question_text="Which state?",
-        question_type=QuestionType.TEXT,
-        required=True,
-        category="address"
-    ),
-    
-    Question(
-        id="address_postal_code",
-        question_text="And your ZIP code?",
-        question_type=QuestionType.TEXT,
-        required=True,
-        category="address"
-    ),
-
-    # Life Stage & Priorities - What first-time buyers understand
-    Question(
-        id="life_stage",
-        question_text="What best describes your current life stage?",
+        id="current_coverage_amount",
+        question_text="If you have existing coverage, what's the total coverage amount?",
         question_type=QuestionType.MCQ_SINGLE,
         options=[
-            QuestionOption(value="young_single", label="Young adult, single, starting career"),
-            QuestionOption(value="young_couple", label="Young couple, no kids yet"),
-            QuestionOption(value="new_parents", label="New parents with young children"),
-            QuestionOption(value="growing_family", label="Growing family with school-age kids"),
-            QuestionOption(value="established_family", label="Established family with teens"),
-            QuestionOption(value="empty_nesters", label="Kids are grown and independent"),
-            QuestionOption(value="pre_retirement", label="Planning for retirement soon"),
-            QuestionOption(value="other", label="Something else")
+            QuestionOption(value="none", label="No existing coverage"),
+            QuestionOption(value="under_50k", label="Under $50,000"),
+            QuestionOption(value="50k_100k", label="$50,000 - $100,000"),
+            QuestionOption(value="100k_250k", label="$100,000 - $250,000"),
+            QuestionOption(value="250k_500k", label="$250,000 - $500,000"),
+            QuestionOption(value="over_500k", label="Over $500,000")
         ],
         required=True,
-        help_text="This helps us understand what kind of protection you need most",
-        category="lifestyle"
+        help_text="We'll check if you're over-insured or have coverage gaps",
+        category="essential"
     ),
-
+    
+    # Question 4: Health Risk (Single most important factor)
     Question(
-        id="main_concern",
-        question_text="What's your biggest worry if something happened to you?",
-        question_type=QuestionType.MCQ_SINGLE,
-        options=[
-            QuestionOption(value="income_replacement", label="My family couldn't pay bills without my income"),
-            QuestionOption(value="mortgage_debt", label="My family couldn't pay the mortgage or other debts"),
-            QuestionOption(value="children_future", label="My kids' education and future would suffer"),
-            QuestionOption(value="medical_bills", label="Medical bills would be overwhelming"),
-            QuestionOption(value="burial_costs", label="Funeral and final expenses"),
-            QuestionOption(value="business_protection", label="My business or employees would struggle"),
-            QuestionOption(value="not_sure", label="I'm not sure what I should worry about")
-        ],
-        required=True,
-        help_text="Understanding your priorities helps us recommend the right coverage",
-        category="priorities"
-    ),
-
-    Question(
-        id="financial_dependents",
-        question_text="Who depends on your income?",
-        question_type=QuestionType.MCQ_SINGLE,
-        options=[
-            QuestionOption(value="none", label="Just me - no one depends on my income"),
-            QuestionOption(value="spouse", label="My spouse/partner"),
-            QuestionOption(value="spouse_kids", label="My spouse and children"),
-            QuestionOption(value="children_only", label="My children (single parent)"),
-            QuestionOption(value="parents", label="My aging parents"),
-            QuestionOption(value="extended", label="Extended family members"),
-            QuestionOption(value="multiple", label="Several people depend on me")
-        ],
-        required=True,
-        help_text="This is key to determining how much coverage you might need",
-        category="priorities"
-    ),
-
-    Question(
-        id="monthly_budget",
-        question_text="What can you comfortably afford to spend monthly on insurance?",
-        question_type=QuestionType.MCQ_SINGLE,
-        options=[
-            QuestionOption(value="25", label="Around $25/month - keeping it minimal"),
-            QuestionOption(value="50", label="About $50/month - reasonable protection"),
-            QuestionOption(value="100", label="Around $100/month - good coverage"),
-            QuestionOption(value="200", label="About $200/month - comprehensive protection"),
-            QuestionOption(value="flexible", label="I want to see options and decide"),
-            QuestionOption(value="unsure", label="I honestly don't know what's reasonable")
-        ],
-        required=True,
-        help_text="Be honest - there are good options at every budget level",
-        category="budget"
-    ),
-
-    Question(
-        id="health_overall",
+        id="health_status",
         question_text="How would you describe your overall health?",
         question_type=QuestionType.MCQ_SINGLE,
         options=[
-            QuestionOption(value="excellent", label="Excellent - I'm very healthy and active"),
-            QuestionOption(value="good", label="Good - generally healthy with minor issues"),
-            QuestionOption(value="fair", label="Fair - some health concerns but manageable"),
-            QuestionOption(value="poor", label="Poor - significant health challenges"),
-            QuestionOption(value="improving", label="Getting better - recovering from health issues")
+            QuestionOption(value="excellent", label="Excellent - no issues, active lifestyle"),
+            QuestionOption(value="good", label="Good - minor issues, generally healthy"),
+            QuestionOption(value="fair", label="Fair - some managed conditions"),
+            QuestionOption(value="poor", label="Poor - multiple health concerns")
         ],
         required=True,
-        help_text="This affects your rates, but everyone can find coverage",
-        category="health"
+        help_text="Honesty ensures accurate quotes and recommendations",
+        category="essential"
     ),
-
+    
+    # Question 5: Primary Insurance Need
     Question(
-        id="smoking_habits",
-        question_text="Do you smoke or use tobacco?",
+        id="primary_need",
+        question_text="What's your main reason for looking at insurance?",
         question_type=QuestionType.MCQ_SINGLE,
         options=[
-            QuestionOption(value="never", label="I've never been a smoker"),
-            QuestionOption(value="quit", label="I quit smoking (over 12 months ago)"),
-            QuestionOption(value="recent_quit", label="I recently quit (within the last year)"),
-            QuestionOption(value="occasional", label="Only occasionally or socially"),
-            QuestionOption(value="regular", label="I'm a regular smoker")
+            QuestionOption(value="save_money", label="Save money on existing coverage"),
+            QuestionOption(value="fill_gaps", label="Fill gaps in current coverage"),
+            QuestionOption(value="first_time", label="First-time buyer - need guidance"),
+            QuestionOption(value="life_change", label="Life change (marriage, baby, new job)"),
+            QuestionOption(value="compare_options", label="Just comparing what's available")
         ],
         required=True,
-        help_text="Smoking significantly affects rates, but being honest helps us find the right fit",
-        category="health"
+        help_text="This helps us focus on what matters most to you",
+        category="essential"
     ),
-
+    
+    # Question 6: Budget Range (Critical for recommendations)
     Question(
-        id="health_conditions",
-        question_text="Do you currently have any ongoing health conditions?",
+        id="budget",
+        question_text="What's your monthly budget for insurance?",
         question_type=QuestionType.MCQ_SINGLE,
         options=[
-            QuestionOption(value="none", label="No ongoing health issues"),
-            QuestionOption(value="minor", label="Minor conditions (allergies, mild asthma, etc.)"),
-            QuestionOption(value="managed", label="Well-controlled conditions (diabetes, high BP, etc.)"),
-            QuestionOption(value="serious", label="More serious conditions"),
-            QuestionOption(value="prefer_discuss", label="I'd prefer to discuss this privately")
+            QuestionOption(value="under_100", label="Under $100/month"),
+            QuestionOption(value="100_200", label="$100-200/month"),
+            QuestionOption(value="200_400", label="$200-400/month"),
+            QuestionOption(value="400_plus", label="$400+/month"),
+            QuestionOption(value="show_all", label="Show me everything")
         ],
         required=True,
-        help_text="Even with health conditions, there are coverage options available",
-        category="health"
+        help_text="We'll only show plans within your budget",
+        category="essential"
     ),
-
+    
+    # Question 7: Coverage Priority
     Question(
-        id="lifestyle_risk",
-        question_text="Any hobbies or activities that might be considered risky?",
+        id="coverage_priority",
+        question_text="What type of coverage is most important?",
         question_type=QuestionType.MCQ_SINGLE,
         options=[
-            QuestionOption(value="low_risk", label="Pretty standard lifestyle - nothing risky"),
-            QuestionOption(value="some_adventure", label="Some adventure sports occasionally"),
-            QuestionOption(value="regular_risk", label="Regular risky hobbies (motorcycles, climbing, etc.)"),
-            QuestionOption(value="high_risk", label="High-risk activities are a big part of my life"),
-            QuestionOption(value="travel", label="I travel frequently to various countries")
+            QuestionOption(value="health_medical", label="Health/Medical coverage"),
+            QuestionOption(value="life_protection", label="Life insurance protection"),
+            QuestionOption(value="critical_illness", label="Critical illness coverage"),
+            QuestionOption(value="comprehensive_all", label="Comprehensive (all types)"),
+            QuestionOption(value="unsure", label="Not sure - need recommendations")
         ],
         required=True,
-        help_text="Just helps us understand what coverage might work best",
-        category="lifestyle"
+        help_text="We'll prioritize plans that match your needs",
+        category="essential"
     ),
-
+    
+    # Question 8: Decision Timeline
     Question(
-        id="insurance_timeline",
-        question_text="When are you looking to have coverage start?",
+        id="timeline",
+        question_text="When do you need coverage to start?",
         question_type=QuestionType.MCQ_SINGLE,
         options=[
-            QuestionOption(value="immediately", label="As soon as possible"),
-            QuestionOption(value="month", label="Within the next month"),
-            QuestionOption(value="few_months", label="In the next few months"),
-            QuestionOption(value="planning", label="Just planning ahead for now"),
-            QuestionOption(value="specific_date", label="By a specific date (wedding, baby, etc.)")
+            QuestionOption(value="immediately", label="Immediately (gap in coverage)"),
+            QuestionOption(value="within_month", label="Within 30 days"),
+            QuestionOption(value="within_3_months", label="Within 3 months"),
+            QuestionOption(value="exploring", label="Just exploring options")
         ],
         required=True,
-        help_text="This helps us prioritize your options",
-        category="timeline"
-    ),
-
-    Question(
-        id="insurance_knowledge",
-        question_text="How familiar are you with life insurance?",
-        question_type=QuestionType.MCQ_SINGLE,
-        options=[
-            QuestionOption(value="beginner", label="Complete beginner - this is all new to me"),
-            QuestionOption(value="some_research", label="I've done some research online"),
-            QuestionOption(value="basic_understanding", label="I understand the basics"),
-            QuestionOption(value="experienced", label="I've had insurance before"),
-            QuestionOption(value="very_knowledgeable", label="I know quite a bit about insurance")
-        ],
-        required=True,
-        help_text="This helps us explain things at the right level for you",
-        category="preferences"
-    ),
-
-    Question(
-        id="decision_factors",
-        question_text="What matters most to you in choosing insurance?",
-        question_type=QuestionType.MCQ_SINGLE,
-        options=[
-            QuestionOption(value="lowest_cost", label="Lowest monthly cost - I need to keep it affordable"),
-            QuestionOption(value="best_value", label="Best value - good balance of cost and coverage"),
-            QuestionOption(value="most_coverage", label="Maximum coverage - cost is less important"),
-            QuestionOption(value="company_reputation", label="Trusted company with good reputation"),
-            QuestionOption(value="simple_process", label="Simple, easy process with quick approval"),
-            QuestionOption(value="not_sure", label="I need help figuring out what should matter most")
-        ],
-        required=True,
-        help_text="This helps us rank the options we show you",
-        category="preferences"
+        help_text="Urgent needs get priority recommendations",
+        category="essential"
     )
 ]
 

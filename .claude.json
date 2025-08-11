@@ -1,0 +1,23 @@
+{
+  "mcpServers": {
+    "serverName": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-code-graph@latest",
+        "I-hate-insurance-agents"
+      ],
+      "env": {
+        "CODEGPT_API_KEY": "sk-517d781d-e59b-41a2-adfc-9cc79e751a65",
+        "CODEGPT_ORG_ID": "6f3dd06d-4c64-476d-a96b-f7538f28888a"
+      }
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": [
+        "@modelcontextprotocol/server-filesystem",
+        "/Users/ray/Desktop/insuretech"
+      ]
+    }
+  }
+}

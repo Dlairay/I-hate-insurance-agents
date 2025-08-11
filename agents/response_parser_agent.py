@@ -9,6 +9,11 @@ import asyncio
 import warnings
 import json
 from typing import Dict, Any, List, Optional
+import sys
+import os
+
+# Add parent directory to path to import shared models
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 # Suppress Pydantic warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="pydantic._internal._fields")
@@ -19,6 +24,9 @@ from google.adk.runners import Runner
 from google.genai import types
 from google.adk.models.lite_llm import LiteLlm
 from dotenv import load_dotenv
+
+from shared.models import ApplicantProfile
+from agents.scoring_agent import get_scoring_agent, PolicyScore, QuotePlan
 
 # Load environment variables
 load_dotenv()
@@ -474,5 +482,158 @@ class ResponseParser:
     
     async def parse_insurance_response(self, raw_response: Dict[str, Any],
                                      user_preferences: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Async method for FastAPI"""
-        return await self.agent.parse_insurance_response(raw_response, user_preferences)
+        """Parse insurance response and include scoring"""
+        
+        # Get basic cards from AI parsing
+        cards = await self.agent.parse_insurance_response(raw_response, user_preferences)
+        
+        # Create ApplicantProfile from user preferences for scoring
+        applicant = self._create_applicant_profile(user_preferences)
+        
+        # Create InsurancePlan objects from raw response
+        plans = self._create_insurance_plans(raw_response)
+        
+        # Score the plans
+        scoring_agent = get_scoring_agent()
+        scored_plans = scoring_agent.score_multiple_policies(plans, applicant)
+        
+        # Enhance cards with scoring information
+        enhanced_cards = self._enhance_cards_with_scores(cards, scored_plans)
+        
+        return enhanced_cards
+    
+    def _create_applicant_profile(self, user_preferences: Dict[str, Any]) -> ApplicantProfile:
+        """Create ApplicantProfile from questionnaire responses"""
+        
+        # Extract fields with sensible defaults
+        profile_data = {
+            "first_name": user_preferences.get("personal_first_name", "User"),
+            "last_name": user_preferences.get("personal_last_name", "Person"),
+            "dob": user_preferences.get("personal_dob", "1990-01-01"),
+            "gender": user_preferences.get("personal_gender", "OTHER"),
+            "email": user_preferences.get("personal_email", "user@example.com"),
+            "phone": user_preferences.get("personal_phone", "000-000-0000"),
+            "address_line1": user_preferences.get("address_line1", "123 Main St"),
+            "city": user_preferences.get("address_city", "Anytown"),
+            "state": user_preferences.get("address_state", "CA"),
+            "postal_code": user_preferences.get("address_postal_code", "12345"),
+            "annual_income": float(user_preferences.get("annual_income", 50000))
+        }
+        
+        # Add health and lifestyle data
+        smoking_habits = user_preferences.get("smoking_vaping_habits", "never")
+        profile_data["smoker"] = smoking_habits not in ["never", "quit_over_year"]
+        
+        # Map exercise habits
+        exercise_mapping = {
+            "daily": "daily",
+            "regular": "3-5x per week", 
+            "occasional": "1-2x per week",
+            "minimal": "rarely",
+            "sedentary": "never"
+        }
+        profile_data["exercise_frequency"] = exercise_mapping.get(
+            user_preferences.get("exercise_habits"), "unknown"
+        )
+        
+        # Map alcohol consumption
+        alcohol_mapping = {
+            "none": "never",
+            "rare": "rarely",
+            "light": "light",
+            "moderate": "moderate", 
+            "regular": "regular",
+            "heavy": "heavy"
+        }
+        profile_data["alcohol_consumption"] = alcohol_mapping.get(
+            user_preferences.get("alcohol_consumption"), "unknown"
+        )
+        
+        return ApplicantProfile(**profile_data)
+    
+    def _create_insurance_plans(self, raw_response: Dict[str, Any]) -> List[QuotePlan]:
+        """Create QuotePlan objects from raw API response"""
+        plans = []
+        
+        # Extract quotes from raw response
+        quotes_list = raw_response.get("quotes", [])
+        
+        for quote_data in quotes_list:
+            try:
+                # Extract recommended_plans from each quote
+                recommended_plans = quote_data.get("recommended_plans", [])
+                for plan_data in recommended_plans:
+                    # Map raw data to QuotePlan model
+                    plan = QuotePlan(
+                        plan_id=plan_data.get("plan_id", "unknown"),
+                        plan_name=plan_data.get("plan_name", "Unknown Plan"),
+                        company_id=quote_data.get("company_id", "unknown"),
+                        company_name=quote_data.get("company_name", "Unknown Company"),
+                        company_rating=quote_data.get("company_rating", 3.5),
+                        coverage_amount=plan_data.get("coverage_amount", 100000),
+                        deductible=plan_data.get("deductible", 0),
+                        base_premium=plan_data.get("base_premium", 0),
+                        rider_premiums=plan_data.get("rider_premiums", {}),
+                        taxes_fees=plan_data.get("taxes_fees", 0),
+                        total_monthly_premium=plan_data.get("total_monthly_premium", 0),
+                        total_annual_premium=plan_data.get("total_annual_premium", 0),
+                        coverage_details=plan_data.get("coverage_details", {}),
+                        exclusions=plan_data.get("exclusions", []),
+                        waiting_periods=plan_data.get("waiting_periods", {})
+                    )
+                    plans.append(plan)
+            except Exception as e:
+                print(f"Error creating QuotePlan: {e}")
+                continue
+        
+        return plans
+    
+    def _enhance_cards_with_scores(self, cards: List[Dict[str, Any]], 
+                                  scored_plans: List[PolicyScore]) -> List[Dict[str, Any]]:
+        """Enhance insurance cards with scoring information"""
+        
+        # Create lookup map by plan_id
+        score_map = {score.plan_id: score for score in scored_plans}
+        
+        enhanced_cards = []
+        
+        for card in cards:
+            plan_id = card.get("plan_id", "")
+            
+            if plan_id in score_map:
+                score = score_map[plan_id]
+                
+                # Add scoring information to card
+                card["scores"] = {
+                    "overall_score": score.overall_score,
+                    "overall_category": score.overall_category.value,
+                    "affordability_score": score.affordability_score,
+                    "ease_of_claims_score": score.ease_of_claims_score,
+                    "coverage_ratio_score": score.coverage_ratio_score,
+                    "income_percentage": score.income_percentage,
+                    "value_proposition": score.value_proposition
+                }
+                
+                # Update existing fields with score-based insights
+                card["value_score"] = score.overall_score
+                
+                # Add badges based on scores
+                if score.affordability_score >= 85:
+                    card["badges"] = card.get("badges", []) + ["Great Value"]
+                if score.ease_of_claims_score >= 90:
+                    card["badges"] = card.get("badges", []) + ["Easy Claims"]
+                if score.coverage_ratio_score >= 85:
+                    card["badges"] = card.get("badges", []) + ["Excellent Coverage"]
+                
+                # Update recommendation flags
+                if score.overall_score >= 85:
+                    card["recommended"] = True
+                if score.affordability_score >= 90:
+                    card["best_value"] = True
+            
+            enhanced_cards.append(card)
+        
+        # Sort by overall score (descending)
+        enhanced_cards.sort(key=lambda x: x.get("scores", {}).get("overall_score", 0), reverse=True)
+        
+        return enhanced_cards

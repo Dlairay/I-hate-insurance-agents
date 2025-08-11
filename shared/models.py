@@ -45,6 +45,7 @@ class Question(BaseModel):
     help_text: Optional[str] = None
     depends_on: Optional[Dict[str, Any]] = None  # Conditional logic
     category: str  # "personal", "health", "financial", "product"
+    has_ai_helper: bool = False  # Enables "I'm not sure" → AI helper
 
 
 class QuestionnaireResponse(BaseModel):
@@ -57,7 +58,7 @@ class QuestionnaireResponse(BaseModel):
 
 
 class QuestionnaireSession(BaseModel):
-    """Complete questionnaire session"""
+    """Complete questionnaire session with direct schema population"""
     session_id: str
     user_id: Optional[str] = None
     responses: List[QuestionnaireResponse] = []
@@ -65,11 +66,15 @@ class QuestionnaireSession(BaseModel):
     current_question_index: int = 0
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+    metadata: Optional[Dict[str, Any]] = {}  # For storing PDF extraction results, etc.
+    
+    # NEW: Direct schema population as user answers
+    user_profile: Optional["UserProfile"] = None
 
 
 # Insurance API Models (standardized)
 class ApplicantProfile(BaseModel):
-    """Standardized applicant profile for insurance API"""
+    """Enhanced applicant profile for insurance API with new questionnaire fields"""
     
     # Personal Information
     first_name: str
@@ -87,12 +92,15 @@ class ApplicantProfile(BaseModel):
     postal_code: str
     country: str = "US"
     
-    # Health Information
+    # Financial Information
+    annual_income: Optional[float] = None
+    occupation: Optional[str] = None
+    
+    # Health Information (enhanced)
     smoker: Optional[bool] = None
+    smoking_vaping_habits: Optional[str] = None  # "never", "quit_over_year", "regular", etc.
     height_cm: Optional[float] = None
     weight_kg: Optional[float] = None
-    occupation: Optional[str] = None
-    annual_income: Optional[float] = None
     
     # Medical History
     pre_existing_conditions: Optional[List[str]] = []
@@ -100,10 +108,25 @@ class ApplicantProfile(BaseModel):
     hospitalizations_last_5_years: Optional[int] = 0
     family_medical_history: Optional[List[str]] = []
     
-    # Lifestyle
-    exercise_frequency: Optional[str] = None
-    alcohol_consumption: Optional[str] = None
+    # Lifestyle Risk Factors (Phase 1)
+    alcohol_consumption: Optional[str] = None  # "none", "light", "moderate", etc.
+    exercise_frequency: Optional[str] = None  # "daily", "regular", "occasional", etc.
+    dietary_habits: Optional[str] = None  # "very_healthy", "mostly_healthy", etc.
+    high_risk_activities: Optional[List[str]] = []  # List of risky hobbies/activities
     travel_frequency: Optional[str] = None
+    
+    # Coverage Gaps & Transition Status (Phase 2)
+    current_coverage_status: Optional[str] = None  # "parents_policy", "employer_current", etc.
+    parents_policy_end_date: Optional[str] = None  # When parent coverage ends
+    employer_coverage_expectation: Optional[str] = None  # Future employer coverage
+    hospital_preference: Optional[str] = None  # "public_only", "private_preferred", etc.
+    special_coverage_needs: Optional[List[str]] = []  # "maternity", "overseas", etc.
+    
+    # Preferences & Budget (Phase 3)
+    coverage_vs_premium_priority: Optional[str] = None  # "lowest_premium", "balanced", etc.
+    desired_add_ons: Optional[List[str]] = []  # "dental", "vision", "mental_health", etc.
+    monthly_premium_budget: Optional[str] = None  # Budget range
+    deductible_copay_preference: Optional[str] = None  # Willingness to pay deductibles
     
     @validator("dob")
     def validate_dob(cls, v: str) -> str:
@@ -141,8 +164,8 @@ class InsurancePlan(BaseModel):
     
     # Coverage
     coverage_amount: float
-    deductible: Optional[float]
-    term_years: Optional[int]
+    deductible: float = 0  # Default to $0 deductible if not specified
+    term_years: int = 1  # Default to 1 year term
     
     # Pricing
     monthly_premium: float
@@ -233,17 +256,164 @@ class InsuranceRecommendation(BaseModel):
     cons: List[str]
 
 
+# Base Schema Models - Foundation for direct questionnaire population
 class UserProfile(BaseModel):
-    """AI-analyzed user profile"""
-    age_group: str  # "young", "middle_aged", "senior"
-    risk_level: str  # "low", "medium", "high"
-    financial_capacity: str  # "budget", "moderate", "premium"
-    health_status: str  # "excellent", "good", "fair", "poor"
+    """Base user profile schema - populated directly from questionnaire responses"""
     
-    # Priorities (inferred from questionnaire)
-    priorities: Dict[str, float]  # {"cost": 0.8, "coverage": 0.6, "speed": 0.3}
+    # Core Identity (required for API)
+    age: int = Field(..., description="User's age")
+    annual_income: float = Field(..., description="Annual income in USD")
+    gender: Literal["M", "F", "OTHER"] = Field(default="OTHER")
     
-    # Constraints
-    max_monthly_budget: Optional[float] = None
-    preferred_companies: List[str] = []
-    must_have_features: List[str] = []
+    # Health Assessment (schema-enforced from MCQ)
+    health_status: Literal["excellent", "good", "fair", "poor"]
+    smoker_status: Literal["never", "former", "current"] = Field(default="never")
+    bmi_category: Literal["underweight", "normal", "overweight", "obese"] = Field(default="normal")
+    
+    # Existing Coverage Analysis (direct MCQ mapping)
+    existing_coverage_type: Literal["none", "employer_basic", "employer_comprehensive", "individual_basic", "individual_comprehensive", "parents"]
+    existing_coverage_amount: Literal["none", "under_50k", "50k_100k", "100k_250k", "250k_500k", "over_500k"]
+    current_monthly_premium: Optional[float] = None
+    
+    # Intent & Preferences (direct MCQ mapping)
+    primary_need: Literal["save_money", "fill_gaps", "first_time", "life_change", "compare_options"]
+    monthly_budget: Literal["under_100", "100_200", "200_400", "400_plus", "show_all"]
+    coverage_priority: Literal["health_medical", "life_protection", "critical_illness", "comprehensive_all", "unsure"]
+    urgency: Literal["immediately", "within_month", "within_3_months", "exploring"]
+    
+    # Derived/Calculated Fields (filled by agents or calculations)
+    risk_score: Optional[int] = Field(default=None, description="0-100 risk assessment")
+    affordability_ratio: Optional[float] = Field(default=None, description="% of income for insurance")
+    
+    def to_applicant_data(self) -> "ApplicantProfile":
+        """Convert to API format - simple mapping, no agent needed"""
+        from datetime import date
+        
+        # Calculate birth year
+        current_year = date.today().year
+        birth_year = current_year - self.age
+        
+        return ApplicantProfile(
+            first_name="User",
+            last_name="Person", 
+            dob=f"{birth_year}-01-01",
+            gender=self.gender,
+            email="user@example.com",
+            phone="000-000-0000",
+            address_line1="123 Main St",
+            city="Anytown", 
+            state="CA",
+            postal_code="12345",
+            annual_income=self.annual_income,
+            smoker=self.smoker_status == "current"
+        )
+
+# Agent Schemas - For intelligent analysis
+class ExistingPolicyAssessment(BaseModel):
+    """Schema for existing policy analysis agent output"""
+    
+    coverage_adequacy: Literal["under_insured", "adequately_insured", "over_insured", "no_coverage"]
+    monthly_cost_assessment: Literal["very_cheap", "reasonable", "expensive", "very_expensive"]
+    coverage_gaps: List[str] = Field(description="List of uncovered risks")
+    over_coverage_areas: List[str] = Field(description="Areas of excessive coverage")
+    
+    # Actionable recommendations
+    primary_action: Literal["no_action", "reduce_coverage", "add_supplemental", "switch_provider", "get_new_coverage"]
+    potential_monthly_savings: float = Field(description="Estimated monthly savings in USD")
+    confidence_score: int = Field(description="Confidence in recommendation 0-100")
+    
+    # Reasoning (LLM generated)
+    analysis_reasoning: str = Field(description="Why this recommendation was made")
+    specific_actions: List[str] = Field(description="3-5 specific action items")
+
+class NeedsEvaluationSchema(BaseModel):
+    """Schema for needs evaluation agent output"""
+    
+    should_get_quotes: bool = Field(description="Should we fetch new insurance quotes?")
+    reasoning: str = Field(description="Why we should/shouldn't get quotes")
+    recommended_coverage_amount: float = Field(description="Suggested coverage amount in USD")
+    priority_product_type: Literal["HEALTH_BASIC", "HEALTH_PREMIUM", "LIFE_TERM", "CRITICAL_ILLNESS"]
+    urgency_level: Literal["immediate", "soon", "can_wait", "no_rush"]
+    
+    # Key insights for user
+    main_recommendation: str = Field(description="Primary recommendation for this user")
+    action_items: List[str] = Field(max_items=4, description="Specific next steps")
+
+class PolicyScore(BaseModel):
+    """Schema for policy scoring agent output"""
+    
+    plan_id: str
+    overall_score: int = Field(description="Overall score 0-100")
+    
+    # The 3 core metrics
+    affordability_score: int = Field(description="0-100 based on income ratio") 
+    ease_of_claims_score: int = Field(description="0-100 based on company data")
+    coverage_ratio_score: int = Field(description="0-100 coverage per dollar")
+    
+    # User context
+    fits_budget: bool
+    matches_priorities: bool
+    
+    # LLM reasoning
+    recommendation_reason: str = Field(description="Why this plan scored this way")
+    best_for_user_because: str = Field(description="What makes this good for this specific user")
+
+
+# Scoring Models (for Mission 3)
+class PolicyScoreBreakdown(BaseModel):
+    """Detailed breakdown of policy scoring"""
+    affordability_score: float = Field(ge=0, le=100)
+    ease_of_claims_score: float = Field(ge=0, le=100) 
+    coverage_ratio_score: float = Field(ge=0, le=100)
+    overall_score: float = Field(ge=0, le=100)
+    
+    # Detailed metrics
+    income_percentage: float  # Percentage of income used for insurance
+    claims_processing_days: Optional[int] = None
+    coverage_per_dollar: float  # Coverage amount per dollar of premium
+    
+    # Categories
+    affordability_category: str  # "Excellent", "Good", etc.
+    claims_ease_category: str
+    coverage_value_category: str
+    overall_category: str
+    
+    # User-specific insights
+    value_proposition: str
+    key_strengths: List[str] = []
+    key_concerns: List[str] = []
+
+
+class EnhancedInsuranceCard(BaseModel):
+    """Insurance card with integrated scoring"""
+    # Basic card info
+    plan_id: str
+    company_name: str
+    plan_name: str
+    
+    # Pricing
+    monthly_cost: str  # Formatted string like "$250/month"
+    annual_cost: str
+    coverage_amount: str  # Formatted string like "$500,000"
+    
+    # Features
+    key_benefits: List[str]
+    riders_included: List[str] = []
+    
+    # Status indicators  
+    instant_approval: bool
+    company_rating: float
+    
+    # Scoring integration (Mission 3)
+    scores: PolicyScoreBreakdown
+    
+    # Visual indicators
+    recommended: bool = False
+    best_value: bool = False
+    fastest_approval: bool = False
+    badges: List[str] = []  # ["Great Value", "Easy Claims", etc.]
+    
+    # Additional details
+    deductible: Optional[str] = None
+    waiting_period: Optional[str] = None
+    exclusions: List[str] = []
