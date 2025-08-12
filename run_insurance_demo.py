@@ -57,7 +57,7 @@ class InsuranceDemo:
             companies = db['companies'].count_documents({})
             if companies == 0:
                 print("📊 Database is empty, populating...")
-                subprocess.run([sys.executable, "backend/populate_db.py"], check=True)
+                subprocess.run([sys.executable, "database/populate_db.py"], check=True)
                 print("✅ Database populated")
             else:
                 print(f"✅ Database has {companies} companies")
@@ -74,7 +74,7 @@ class InsuranceDemo:
         print("🏥 Starting Insurance Backend API (port 8000)...")
         process = subprocess.Popen([
             sys.executable, "-m", "uvicorn",
-            "backend.insurance_backend_mongo:app",
+            "insurance_backend.insurance_backend_mongo:app",
             "--host", "0.0.0.0",
             "--port", "8000",
             "--reload"
@@ -87,7 +87,7 @@ class InsuranceDemo:
         print("📋 Starting Questionnaire Server (port 8001)...")
         process = subprocess.Popen([
             sys.executable, "-m", "uvicorn",
-            "questionnaire.server:app",
+            "backend.questionnaire_server:app",
             "--host", "0.0.0.0",
             "--port", "8001",
             "--reload"

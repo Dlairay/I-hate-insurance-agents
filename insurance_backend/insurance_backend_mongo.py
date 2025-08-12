@@ -17,35 +17,23 @@ from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel, Field, validator
 from motor.motor_asyncio import AsyncIOMotorClient
 
-try:
-    from backend.database import (
-        async_db, Collections, DatabaseOperations,
-        get_company_products, get_customer_policies
-    )
-except ImportError:
-    try:
-        from database import (
-            async_db, Collections, DatabaseOperations,
-            get_company_products, get_customer_policies
-        )
-    except ImportError:
-        # Fallback - create minimal implementations
-        async_db = None
-        Collections = type('Collections', (), {
-            'COMPANIES': 'companies',
-            'PRODUCTS': 'products', 
-            'CUSTOMERS': 'customers',
-            'POLICIES': 'policies',
-            'CLAIMS': 'claims'
-        })()
-        class DatabaseOperations:
-            @staticmethod
-            async def get_documents(collection, query=None, limit=100):
-                return []
-        async def get_company_products(company_id):
-            return []
-        async def get_customer_policies(customer_id, status="active"):
-            return []
+from database.database import (
+    async_db, Collections, DatabaseOperations,
+    get_company_products, get_customer_policies
+)
+from bson import ObjectId
+
+
+def convert_objectid_to_string(data):
+    """Convert MongoDB ObjectIds to strings for JSON serialization"""
+    if isinstance(data, dict):
+        return {key: convert_objectid_to_string(value) for key, value in data.items()}
+    elif isinstance(data, list):
+        return [convert_objectid_to_string(item) for item in data]
+    elif isinstance(data, ObjectId):
+        return str(data)
+    else:
+        return data
 
 
 # Reuse the same enums and models from the original backend
@@ -96,6 +84,12 @@ class ApplicantData(BaseModel):
     weight_kg: Optional[float] = None
     occupation: Optional[str] = None
     annual_income: Optional[float] = None
+    
+    # Enhanced lifestyle risk factors (v2.0)
+    smoking_vaping_habits: Optional[str] = None
+    alcohol_consumption: Optional[str] = None
+    exercise_frequency: Optional[str] = None
+    high_risk_activities: Optional[List[str]] = []
     
     pre_existing_conditions: Optional[List[str]] = []
     medications: Optional[List[str]] = []
@@ -360,6 +354,84 @@ async def calculate_risk_score(applicant: ApplicantData, product_type: str) -> D
     if applicant.hospitalizations_last_5_years and applicant.hospitalizations_last_5_years > 2:
         risk_score += 10
         risk_factors.append("Multiple hospitalizations")
+    
+    # NEW LIFESTYLE RISK FACTORS
+    
+    # Enhanced smoking/vaping assessment
+    if hasattr(applicant, 'smoking_vaping_habits') and applicant.smoking_vaping_habits:
+        smoking_risks = {
+            "daily": 20,
+            "regular": 15,
+            "occasional": 8,
+            "quit_under_year": 10,
+            "quit_over_year": 5,
+            "never": 0
+        }
+        smoke_risk = smoking_risks.get(applicant.smoking_vaping_habits, 0)
+        if smoke_risk > 0:
+            risk_score += smoke_risk
+            risk_factors.append(f"Smoking/vaping: {applicant.smoking_vaping_habits}")
+    
+    # Occupation risk assessment
+    if hasattr(applicant, 'occupation') and applicant.occupation:
+        high_risk_occupations = {
+            "construction": 12,
+            "law_enforcement": 10,
+            "transportation": 8,
+            "self_employed": 5
+        }
+        occ_risk = high_risk_occupations.get(applicant.occupation, 0)
+        if occ_risk > 0:
+            risk_score += occ_risk
+            risk_factors.append(f"High-risk occupation: {applicant.occupation}")
+    
+    # Alcohol consumption
+    if hasattr(applicant, 'alcohol_consumption') and applicant.alcohol_consumption:
+        alcohol_risks = {
+            "daily": 12,
+            "moderate": 6,
+            "social": 2,
+            "rare": 0,
+            "never": -2  # Slight benefit for non-drinkers
+        }
+        alcohol_risk = alcohol_risks.get(applicant.alcohol_consumption, 0)
+        risk_score += alcohol_risk
+        if alcohol_risk > 0:
+            risk_factors.append(f"Alcohol consumption: {applicant.alcohol_consumption}")
+    
+    # Exercise frequency (positive factor)
+    if hasattr(applicant, 'exercise_frequency') and applicant.exercise_frequency:
+        exercise_benefits = {
+            "daily": -8,
+            "regular": -5,
+            "weekly": -2,
+            "monthly": 0,
+            "rarely": 3
+        }
+        exercise_impact = exercise_benefits.get(applicant.exercise_frequency, 0)
+        risk_score += exercise_impact
+        if exercise_impact < 0:
+            risk_factors.append(f"Regular exercise: {applicant.exercise_frequency}")
+        elif exercise_impact > 0:
+            risk_factors.append(f"Sedentary lifestyle: {applicant.exercise_frequency}")
+    
+    # High-risk activities
+    if hasattr(applicant, 'high_risk_activities') and applicant.high_risk_activities:
+        if "none" not in applicant.high_risk_activities:
+            high_risk_points = {
+                "scuba": 5,
+                "skydiving": 8,
+                "racing": 10,
+                "climbing": 6,
+                "martial_arts": 4,
+                "flying": 7,
+                "extreme_sports": 10
+            }
+            for activity in applicant.high_risk_activities:
+                activity_risk = high_risk_points.get(activity, 0)
+                if activity_risk > 0:
+                    risk_score += activity_risk
+                    risk_factors.append(f"High-risk activity: {activity}")
     
     return {
         "score": min(risk_score, 100),
@@ -778,7 +850,9 @@ async def submit_claim(request: ClaimRequest) -> ClaimResponse:
 async def list_companies():
     """List all insurance companies"""
     companies = await DatabaseOperations.get_documents(Collections.COMPANIES)
-    return {"companies": companies}
+    # Convert ObjectIds to strings for JSON serialization
+    companies_clean = convert_objectid_to_string(companies)
+    return {"companies": companies_clean}
 
 
 @app.get("/v1/products")
@@ -791,8 +865,265 @@ async def list_products(company_id: Optional[str] = None, product_type: Optional
         query["product_type"] = product_type
     
     products = await DatabaseOperations.get_documents(Collections.PRODUCTS, query)
-    return {"products": products}
+    # Convert ObjectIds to strings for JSON serialization
+    products_clean = convert_objectid_to_string(products)
+    return {"products": products_clean}
 
+
+@app.post("/v1/policy/purchase")
+async def purchase_policy(purchase_request: Dict[str, Any]):
+    """Purchase a policy from a quote - simplified for demo"""
+    try:
+        # Extract required data
+        plan_id = purchase_request.get("plan_id")
+        user_id = purchase_request.get("user_id")
+        quote_data = purchase_request.get("quote_data", {})
+        
+        if not plan_id or not user_id:
+            raise HTTPException(status_code=400, detail="Missing plan_id or user_id")
+        
+        # Generate policy IDs
+        policy_id = f"POL{uuid.uuid4().hex[:8].upper()}"
+        policy_number = f"PN-{datetime.now().strftime('%Y%m%d')}-{uuid.uuid4().hex[:6].upper()}"
+        
+        # Create policy document
+        policy_doc = {
+            "policy_id": policy_id,
+            "policy_number": policy_number,
+            "user_id": user_id,  # Link to user account
+            "plan_id": plan_id,
+            
+            # Copy quote data
+            "company_name": quote_data.get("company_name", "Unknown"),
+            "plan_name": quote_data.get("plan_name", "Unknown Plan"),
+            "coverage_amount": quote_data.get("coverage_amount", 0),
+            "monthly_premium": quote_data.get("monthly_premium", 0),
+            "annual_premium": quote_data.get("annual_premium", 0),
+            
+            # Policy status
+            "status": "active",
+            "purchase_date": datetime.utcnow(),
+            "effective_date": datetime.utcnow(),
+            "next_payment_date": datetime.utcnow(),
+            
+            # Demo data
+            "payment_method": purchase_request.get("payment_method", "demo_card"),
+            "created_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow()
+        }
+        
+        # Save policy to database
+        await async_db[Collections.POLICIES].insert_one(policy_doc)
+        
+        # Update user's purchased policies list
+        from backend.database import Collections as DbCollections
+        await async_db[DbCollections.USERS].update_one(
+            {"user_id": user_id},
+            {"$addToSet": {"purchased_policies": policy_id}}
+        )
+        
+        return {
+            "success": True,
+            "policy_id": policy_id,
+            "policy_number": policy_number,
+            "message": "Policy purchased successfully!",
+            "policy_details": {
+                "company_name": policy_doc["company_name"],
+                "plan_name": policy_doc["plan_name"], 
+                "coverage_amount": policy_doc["coverage_amount"],
+                "monthly_premium": policy_doc["monthly_premium"],
+                "status": "active"
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Policy purchase error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to purchase policy: {str(e)}")
+
+@app.get("/v1/user/{user_id}/policies")
+async def get_user_policies(user_id: str):
+    """Get all policies for a user"""
+    try:
+        print(f"🔍 Getting policies for user: {user_id}")
+        policies = []
+        policy_docs = async_db[Collections.POLICIES].find({"user_id": user_id})
+        
+        async for policy in policy_docs:
+            print(f"📋 Found policy: {policy['policy_id']} for user {policy.get('user_id')}")
+            policies.append({
+                "policy_id": policy["policy_id"],
+                "policy_number": policy["policy_number"],
+                "company_name": policy.get("company_name", "Unknown"),
+                "plan_name": policy.get("plan_name", "Unknown Plan"),
+                "coverage_amount": policy.get("coverage_amount", 0),
+                "monthly_premium": policy.get("monthly_premium", 0),
+                "status": policy.get("status", "unknown"),
+                "purchase_date": policy.get("purchase_date"),
+                "effective_date": policy.get("effective_date"),
+                "next_payment_date": policy.get("next_payment_date")
+            })
+        
+        print(f"✅ Total policies found for {user_id}: {len(policies)}")
+        return {
+            "success": True,
+            "user_id": user_id,
+            "policies": policies,
+            "total_policies": len(policies)
+        }
+        
+    except Exception as e:
+        print(f"❌ Get user policies error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get user policies")
+
+@app.post("/v1/claims/file")
+async def file_claim(claim_request: Dict[str, Any]):
+    """File a new insurance claim"""
+    try:
+        # Extract required data
+        policy_id = claim_request.get("policy_id")
+        user_id = claim_request.get("user_id")
+        claim_type = claim_request.get("claim_type", "general")
+        incident_description = claim_request.get("incident_description", "")
+        claim_amount = claim_request.get("claim_amount", 0)
+        
+        if not policy_id or not user_id:
+            raise HTTPException(status_code=400, detail="Missing policy_id or user_id")
+        
+        # Verify user owns the policy
+        policy = await async_db[Collections.POLICIES].find_one({
+            "policy_id": policy_id, 
+            "user_id": user_id
+        })
+        
+        if not policy:
+            raise HTTPException(status_code=404, detail="Policy not found or not owned by user")
+        
+        # Generate claim IDs
+        claim_id = f"CLM{uuid.uuid4().hex[:8].upper()}"
+        claim_number = f"CN-{datetime.now().strftime('%Y%m%d')}-{uuid.uuid4().hex[:6].upper()}"
+        
+        # Create claim document
+        claim_doc = {
+            "claim_id": claim_id,
+            "claim_number": claim_number,
+            "policy_id": policy_id,
+            "user_id": user_id,
+            "company_name": policy.get("company_name", "Unknown"),
+            
+            # Claim details
+            "claim_type": claim_type,
+            "incident_description": incident_description,
+            "claim_amount": float(claim_amount) if claim_amount else 0,
+            
+            # Status tracking
+            "status": "submitted",
+            "submission_date": datetime.utcnow(),
+            "last_updated": datetime.utcnow(),
+            
+            # Processing info
+            "estimated_processing_days": 5,  # Demo value
+            "adjuster_assigned": None,
+            "documents_required": ["incident_report", "supporting_evidence"],
+            
+            "created_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow()
+        }
+        
+        # Save claim to database
+        await async_db[Collections.CLAIMS].insert_one(claim_doc)
+        
+        return {
+            "success": True,
+            "claim_id": claim_id,
+            "claim_number": claim_number,
+            "message": "Claim filed successfully!",
+            "claim_details": {
+                "claim_number": claim_number,
+                "policy_id": policy_id,
+                "claim_type": claim_type,
+                "claim_amount": claim_amount,
+                "status": "submitted",
+                "estimated_processing_days": 5
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ File claim error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to file claim: {str(e)}")
+
+@app.get("/v1/user/{user_id}/claims")
+async def get_user_claims(user_id: str):
+    """Get all claims for a user"""
+    try:
+        claims = []
+        claim_docs = async_db[Collections.CLAIMS].find({"user_id": user_id})
+        
+        async for claim in claim_docs:
+            claims.append({
+                "claim_id": claim["claim_id"],
+                "claim_number": claim["claim_number"],
+                "policy_id": claim["policy_id"],
+                "company_name": claim.get("company_name", "Unknown"),
+                "claim_type": claim.get("claim_type", "general"),
+                "claim_amount": claim.get("claim_amount", 0),
+                "status": claim.get("status", "unknown"),
+                "submission_date": claim.get("submission_date"),
+                "last_updated": claim.get("last_updated"),
+                "incident_description": claim.get("incident_description", ""),
+                "estimated_processing_days": claim.get("estimated_processing_days", 0)
+            })
+        
+        return {
+            "success": True,
+            "user_id": user_id,
+            "claims": claims,
+            "total_claims": len(claims)
+        }
+        
+    except Exception as e:
+        print(f"❌ Get user claims error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get user claims")
+
+@app.get("/v1/claims/{claim_id}")
+async def get_claim_details(claim_id: str, user_id: str):
+    """Get detailed information about a specific claim"""
+    try:
+        claim = await async_db[Collections.CLAIMS].find_one({
+            "claim_id": claim_id,
+            "user_id": user_id  # Ensure user owns the claim
+        })
+        
+        if not claim:
+            raise HTTPException(status_code=404, detail="Claim not found")
+        
+        return {
+            "success": True,
+            "claim": {
+                "claim_id": claim["claim_id"],
+                "claim_number": claim["claim_number"],
+                "policy_id": claim["policy_id"],
+                "company_name": claim.get("company_name", "Unknown"),
+                "claim_type": claim.get("claim_type", "general"),
+                "claim_amount": claim.get("claim_amount", 0),
+                "status": claim.get("status", "unknown"),
+                "submission_date": claim.get("submission_date"),
+                "last_updated": claim.get("last_updated"),
+                "incident_description": claim.get("incident_description", ""),
+                "estimated_processing_days": claim.get("estimated_processing_days", 0),
+                "documents_required": claim.get("documents_required", []),
+                "adjuster_assigned": claim.get("adjuster_assigned")
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Get claim details error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get claim details")
 
 @app.get("/health")
 async def health_check():

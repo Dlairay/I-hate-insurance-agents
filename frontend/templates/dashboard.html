@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Clearcover</title>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-image: url('/static/images/background_img.png');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            min-height: 100vh;
+        }
+        
+        /* Header */
+        .header {
+            background: transparent;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 0 1rem;
+        }
+        
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .logo-container img {
+            height: 40px;
+            width: 40px;
+        }
+        
+        .logo-text {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .search-bar {
+            flex: 1;
+            max-width: 350px;
+            margin: 0 2rem;
+        }
+        
+        .search-input {
+            width: 100%;
+            padding: 0.6rem 1.2rem;
+            border: 1px solid #e0e0e0;
+            border-radius: 25px;
+            font-size: 0.9rem;
+            background: white;
+        }
+        
+        .search-input:focus {
+            outline: none;
+            border-color: #5ECDB9;
+            background: white;
+        }
+        
+        .view-more-link {
+            color: #5ECDB9;
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+        
+        .view-more-link:hover {
+            text-decoration: underline;
+        }
+        
+        /* Main Content */
+        .main-container {
+            padding: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        /* Active Plans Section */
+        .section {
+            margin-bottom: 2.5rem;
+        }
+        
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+        
+        .section-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .view-more {
+            color: #5ECDB9;
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+        
+        .plans-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            max-width: 800px;
+        }
+        
+        .plan-card {
+            background: white;
+            border-radius: 20px;
+            padding: 0.5rem;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            width: 200px;
+            height: 200px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        
+        .plan-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+        }
+        
+        .plan-type {
+            display: inline-block;
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            margin-bottom: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .plan-type.medical {
+            background: #5ECDB9;
+            color: white;
+        }
+        
+        .plan-type.dental {
+            background: #9B59B6;
+            color: white;
+        }
+        
+        .plan-type.life {
+            background: #3498DB;
+            color: white;
+        }
+        
+        .plan-name {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 0.4rem;
+        }
+        
+        .plan-duration {
+            font-size: 0.75rem;
+            color: #666;
+            margin-bottom: 0.8rem;
+        }
+        
+        .plan-icons {
+            display: flex;
+            justify-content: center;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+        
+        .plan-icon {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: #f0f0f0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            color: #666;
+            position: relative;
+        }
+        
+        .plan-icon::after {
+            content: '→';
+            font-size: 0.9rem;
+            font-weight: bold;
+        }
+        
+        /* Claims Section */
+        .claims-section {
+            background: rgba(255, 248, 220, 0.4);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 2rem;
+            min-height: 200px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        
+        .claims-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        
+        .new-claim-btn {
+            background: #5ECDB9;
+            color: white;
+            padding: 0.5rem 1.2rem;
+            border: none;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .new-claim-btn:hover {
+            background: #4DB8A3;
+            transform: translateY(-1px);
+        }
+        
+        .recent-claims {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 0.8rem;
+            max-width: 600px;
+        }
+        
+        .claim-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.2rem;
+            text-align: center;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            width: 240px;
+        }
+        
+        .claim-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.12);
+        }
+        
+        .claim-provider {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 1rem;
+            font-size: 0.9rem;
+        }
+        
+        .claim-amount {
+            background: #5ECDB9;
+            color: white;
+            padding: 0.8rem 1.2rem;
+            border-radius: 25px;
+            font-weight: 600;
+            margin-bottom: 0.8rem;
+            display: inline-block;
+            font-size: 0.9rem;
+        }
+        
+        .claim-amount.health-amount {
+            background: #E74C3C;
+        }
+        
+        .claim-status {
+            font-size: 0.8rem;
+            color: #666;
+            font-weight: 500;
+        }
+        
+        
+        @media (max-width: 768px) {
+            .header {
+                padding: 1rem 1.5rem;
+                flex-wrap: wrap;
+            }
+            
+            .search-bar {
+                order: 3;
+                flex: 100%;
+                margin: 1rem 0 0 0;
+                max-width: 100%;
+            }
+            
+            .main-container {
+                padding: 1.5rem;
+            }
+            
+            .plans-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .recent-claims {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="logo-container">
+            <img src="/static/images/logo.png" alt="Clearcover">
+            <span class="logo-text">Clearcover</span>
+        </div>
+        
+        <div class="search-bar">
+            <input type="text" class="search-input" placeholder="Type here to search a provider...">
+        </div>
+        
+        <a href="/questionnaire" class="view-more-link">Reevaluate Coverage</a>
+    </div>
+    
+    <!-- Main Content -->
+    <div class="main-container">
+        <!-- Active Plans Section -->
+        <div class="section">
+            <div class="section-header">
+                <h2 class="section-title">Active Plans</h2>
+                <a href="#" class="view-more">View More</a>
+            </div>
+            
+            <div class="plans-grid">
+                <div class="plan-card" onclick="viewPlanDetails('medical')">
+                    <div>
+                        <div class="plan-type medical">Medical</div>
+                        <div class="plan-name">Health Plus</div>
+                        <div class="plan-duration">2 Years (CF)</div>
+                    </div>
+                    <div class="plan-icons">
+                        <div class="plan-icon"></div>
+                    </div>
+                </div>
+                
+                <div class="plan-card" onclick="viewPlanDetails('dental')">
+                    <div>
+                        <div class="plan-type dental">Dental</div>
+                        <div class="plan-name">Smile Care</div>
+                        <div class="plan-duration">6 Mths (CR)</div>
+                    </div>
+                    <div class="plan-icons">
+                        <div class="plan-icon"></div>
+                    </div>
+                </div>
+                
+                <div class="plan-card" onclick="viewPlanDetails('life')">
+                    <div>
+                        <div class="plan-type life">Life</div>
+                        <div class="plan-name">Term Life</div>
+                        <div class="plan-duration">Annual</div>
+                    </div>
+                    <div class="plan-icons">
+                        <div class="plan-icon"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Claims Section -->
+        <div class="section">
+            <div class="claims-section">
+                <div class="claims-header">
+                    <h2 class="section-title" style="margin: 0;">Claims</h2>
+                    <button class="new-claim-btn" onclick="window.location.href='/claims'">New Claim</button>
+                </div>
+                
+                <div class="recent-claims">
+                    <div class="claim-card">
+                        <div class="claim-provider">Smile Care</div>
+                        <div class="claim-amount">$590</div>
+                        <div class="claim-status">Approved</div>
+                    </div>
+                    
+                    <div class="claim-card">
+                        <div class="claim-provider">Health Plus</div>
+                        <div class="claim-amount health-amount">$600</div>
+                        <div class="claim-status">Pending</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Check if user is logged in
+        const userData = localStorage.getItem('user_data');
+        if (!userData) {
+            window.location.href = '/login';
+        }
+        
+        function viewPlanDetails(planType) {
+            alert(`Viewing details for ${planType} plan`);
+        }
+    </script>
+</body>
+</html>

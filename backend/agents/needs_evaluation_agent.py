@@ -35,7 +35,7 @@ ollama_model = LiteLlm(model="ollama_chat/llama3:latest")
 import sys
 import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-from shared.models import UserProfile, ExistingPolicyAssessment, NeedsEvaluationSchema
+from backend.shared.models import UserProfile, ExistingPolicyAssessment, NeedsEvaluationSchema
 
 logger = logging.getLogger(__name__)
 
@@ -394,7 +394,7 @@ async def evaluate_user_needs(
 if __name__ == "__main__":
     # Test the agent
     async def test():
-        from shared.models import UserProfile
+        from backend.shared.models import UserProfile
         
         test_profile = UserProfile(
             age=28,

@@ -45,7 +45,9 @@ class Question(BaseModel):
     help_text: Optional[str] = None
     depends_on: Optional[Dict[str, Any]] = None  # Conditional logic
     category: str  # "personal", "health", "financial", "product"
-    has_ai_helper: bool = False  # Enables "I'm not sure" → AI helper
+    
+    # AI Chatbot Feature (pre-computed, not runtime)
+    show_ai_help: bool = False   # Whether to show AI chatbot help button
 
 
 class QuestionnaireResponse(BaseModel):
@@ -280,6 +282,15 @@ class UserProfile(BaseModel):
     monthly_budget: Literal["under_100", "100_200", "200_400", "400_plus", "show_all"]
     coverage_priority: Literal["health_medical", "life_protection", "critical_illness", "comprehensive_all", "unsure"]
     urgency: Literal["immediately", "within_month", "within_3_months", "exploring"]
+    
+    # NEW: Enhanced Lifestyle & Risk Factors (v2.0)
+    occupation: Optional[str] = Field(default="office_professional")
+    smoking_status: Optional[str] = Field(default="never") 
+    alcohol_consumption: Optional[str] = Field(default="social")
+    exercise_frequency: Optional[str] = Field(default="weekly")
+    high_risk_activities: Optional[List[str]] = Field(default=["none"])
+    monthly_premium_budget: Optional[str] = Field(default="flexible")
+    desired_add_ons: Optional[List[str]] = Field(default=["none"])
     
     # Derived/Calculated Fields (filled by agents or calculations)
     risk_score: Optional[int] = Field(default=None, description="0-100 risk assessment")

@@ -98,11 +98,14 @@ User Input (Manual/JSON/PDF) → 3-Phase Questionnaire → Enhanced Applicant Pr
 - **Profile Matching**: Analyzes 3-phase questionnaire responses
 - **Output**: Confidence-scored recommendations with detailed explanations
 
-#### 7. **Enhanced Web Frontend**
-- **Three-Path Entry**: Manual, JSON upload, or PDF upload 🆕
-- **Phase-Aware UI**: Progress tracking shows current phase
-- **PDF Upload Interface**: Drag-and-drop with extraction feedback
-- **Enhanced Results**: All cards show 3-metric scoring with visual indicators
+#### 7. **Modern Web Frontend (v2.1)** 🔄
+- **Redesigned Interface**: Complete UI overhaul matching professional design standards
+- **Three-Path Entry**: Manual, JSON upload (via Singpass), or PDF upload 🆕
+- **Enhanced Progress Steps**: Dynamic progress tracking with custom icons and state management
+- **Glassmorphism Design**: Modern translucent UI elements with backdrop blur effects
+- **Question Flow Integration**: Seamless backend integration with proper MCQ handling
+- **Responsive Layout**: 90% screen width utilization with proper spacing
+- **Background Consistency**: Unified background image across all pages
 
 ## Enhanced File Structure & Architecture (v2.0)
 
@@ -620,6 +623,19 @@ python -c "from agents.questionnaire_agent import QuestionnaireHelper; print('AI
 - **User Experience**: Intuitive interface with real-time assistance
 
 ## Recent Fixes Applied
+
+### **v2.1 Frontend Redesign (Latest Update)**
+- ✅ **Complete UI Overhaul**: Redesigned questionnaire to match professional reference designs
+- ✅ **Dashboard Modernization**: Updated dashboard with glassmorphism effects and proper card layouts
+- ✅ **Progress Step Icons**: Implemented custom icons for each phase with state management
+- ✅ **Background Consistency**: Applied unified background image across all pages
+- ✅ **Singpass Integration**: Replaced JSON upload with professional Singpass button interface
+- ✅ **Question Flow Backend Integration**: Proper connection to questionnaire server with MCQ support
+- ✅ **Question Type Handling**: Full support for MCQ_SINGLE, MCQ_MULTIPLE, and text input questions
+- ✅ **Responsive Design**: 90% screen width with proper spacing and visual hierarchy
+- ✅ **Navigation Flow**: Complete 3-screen flow (Start → PDF Upload → Questions → Results)
+
+### **Previous Core Fixes**
 - ✅ Fixed JavaScript syntax errors in questionnaire.js
 - ✅ Resolved Google ADK type annotation conflicts  
 - ✅ Fixed Question model vs dictionary conversion issues

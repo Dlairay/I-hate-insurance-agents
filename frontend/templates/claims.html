@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>New Claim - Clearcover</title>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-image: url('/static/images/background_img.png');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            min-height: 100vh;
+        }
+        
+        /* Header */
+        .header {
+            background: white;
+            padding: 1rem 3rem;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .logo-container img {
+            height: 40px;
+            width: 40px;
+        }
+        
+        .logo-text {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .back-btn {
+            color: #666;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: color 0.3s;
+        }
+        
+        .back-btn:hover {
+            color: #333;
+        }
+        
+        /* Main Content */
+        .main-container {
+            max-width: 800px;
+            margin: 3rem auto;
+            padding: 0 2rem;
+        }
+        
+        .page-title {
+            font-size: 2rem;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 2rem;
+        }
+        
+        /* Form Card */
+        .form-card {
+            background: white;
+            border-radius: 15px;
+            padding: 2.5rem;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
+        }
+        
+        /* Form Groups */
+        .form-section {
+            margin-bottom: 2rem;
+        }
+        
+        .form-section-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 1rem;
+        }
+        
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        
+        .form-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #666;
+            font-size: 0.9rem;
+        }
+        
+        .form-input,
+        .form-select,
+        .form-textarea {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.3s;
+            background: #fafafa;
+        }
+        
+        .form-input:focus,
+        .form-select:focus,
+        .form-textarea:focus {
+            outline: none;
+            border-color: #5ECDB9;
+            background: white;
+        }
+        
+        .form-textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+        
+        /* Two Column Layout */
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+        }
+        
+        /* File Upload */
+        .file-upload {
+            border: 2px dashed #ddd;
+            border-radius: 10px;
+            padding: 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: #fafafa;
+        }
+        
+        .file-upload:hover {
+            border-color: #5ECDB9;
+            background: white;
+        }
+        
+        .file-upload.dragover {
+            border-color: #5ECDB9;
+            background: #f0fffc;
+        }
+        
+        .upload-icon {
+            font-size: 2rem;
+            color: #999;
+            margin-bottom: 0.5rem;
+        }
+        
+        .upload-text {
+            color: #666;
+            margin-bottom: 0.25rem;
+        }
+        
+        .upload-hint {
+            color: #999;
+            font-size: 0.85rem;
+        }
+        
+        .file-input {
+            display: none;
+        }
+        
+        /* Checkboxes */
+        .checkbox-group {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+        
+        .checkbox-input {
+            margin-top: 0.25rem;
+        }
+        
+        .checkbox-label {
+            color: #666;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+        
+        /* Claim Amount */
+        .claim-amount {
+            font-size: 0.85rem;
+            color: #999;
+            margin-top: 0.25rem;
+        }
+        
+        /* Submit Button */
+        .submit-section {
+            margin-top: 2rem;
+            padding-top: 2rem;
+            border-top: 1px solid #eee;
+        }
+        
+        .submit-btn {
+            background: #5ECDB9;
+            color: white;
+            padding: 0.9rem 2rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .submit-btn:hover {
+            background: #4DB8A3;
+            transform: translateY(-1px);
+        }
+        
+        .total-claimable {
+            text-align: right;
+            margin-bottom: 1rem;
+        }
+        
+        .total-label {
+            color: #666;
+            font-size: 0.9rem;
+        }
+        
+        .total-amount {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        @media (max-width: 768px) {
+            .header {
+                padding: 1rem 1.5rem;
+            }
+            
+            .main-container {
+                padding: 0 1rem;
+                margin: 2rem auto;
+            }
+            
+            .form-card {
+                padding: 1.5rem;
+            }
+            
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="logo-container">
+            <img src="/static/images/logo.png" alt="Clearcover">
+            <span class="logo-text">Clearcover</span>
+        </div>
+        
+        <a href="/dashboard" class="back-btn">
+            ← Back to Dashboard
+        </a>
+    </div>
+    
+    <!-- Main Content -->
+    <div class="main-container">
+        <h1 class="page-title">New Claim</h1>
+        
+        <form class="form-card" id="claimForm">
+            <!-- Plan Information -->
+            <div class="form-section">
+                <h2 class="form-section-title">Plan Information</h2>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Plan Type</label>
+                        <select class="form-select" id="planType" required>
+                            <option value="">Select your plan type</option>
+                            <option value="medical">Medical - Health Plus</option>
+                            <option value="dental">Dental - Smile Care</option>
+                            <option value="life">Life - Term Life</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Claim Type</label>
+                        <select class="form-select" id="claimType" required>
+                            <option value="">Select claim type</option>
+                            <option value="hospitalization">Hospitalization</option>
+                            <option value="outpatient">Outpatient Treatment</option>
+                            <option value="dental">Dental Treatment</option>
+                            <option value="specialist">Specialist Consultation</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Personal Information -->
+            <div class="form-section">
+                <h2 class="form-section-title">Personal Information</h2>
+                
+                <div class="form-group">
+                    <label class="form-label">Name (Your NRIC name)</label>
+                    <input type="text" class="form-input" id="fullName" placeholder="Enter your full name" required>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Medical Provider / Merchant</label>
+                        <input type="text" class="form-input" id="provider" placeholder="Enter hospital or clinic name" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Receipt Date</label>
+                        <input type="date" class="form-input" id="receiptDate" required>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Receipt Information -->
+            <div class="form-section">
+                <h2 class="form-section-title">Receipt Information</h2>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Receipt No. (if not available, enter with a "-")</label>
+                        <input type="text" class="form-input" id="receiptNo" placeholder="Enter receipt number">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Receipt Amount (To enter amount in SGD)</label>
+                        <input type="number" class="form-input" id="receiptAmount" placeholder="0.00" step="0.01" required>
+                        <div class="claim-amount">Maximum claimable: $10,000 SGD</div>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Diagnosis / Medical Condition</label>
+                    <textarea class="form-textarea" id="diagnosis" placeholder="Enter your diagnosis or medical condition" required></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">GST Inclusive?</label>
+                    <select class="form-select" id="gstInclusive" required>
+                        <option value="">Select from drop down</option>
+                        <option value="yes">Yes</option>
+                        <option value="no">No</option>
+                    </select>
+                </div>
+            </div>
+            
+            <!-- Additional Information -->
+            <div class="form-section">
+                <h2 class="form-section-title">Additional Information</h2>
+                
+                <div class="form-group">
+                    <label class="form-label">Remarks (Leave this box empty if there are no additional remarks)</label>
+                    <textarea class="form-textarea" id="remarks" placeholder="Enter any additional remarks here"></textarea>
+                </div>
+                
+                <div class="checkbox-group">
+                    <input type="checkbox" class="checkbox-input" id="confirmInfo" required>
+                    <label class="checkbox-label" for="confirmInfo">
+                        I have read and confirm that all my claim submission complies with the Bank's Flex Plan Terms and Conditions. I acknowledge that Bank reserves the rights to reject my claims if any claims are found to be not in compliance with the Flex Plan Terms and Conditions and DXX may clawback any claims found to be not in compliance. This is in addition to other rights the Bank may have under the Flex Plan Terms and Conditions, including without limitation the Bank's rights under the Prohibited Activities/ Practices as set out in the Flex Plan Terms and Conditions.<br><br>
+                        I also confirm compliance with the plan and consent to recovery if not in line to continue.
+                    </label>
+                </div>
+            </div>
+            
+            <!-- Document Upload -->
+            <div class="form-section">
+                <h2 class="form-section-title">Add Receipt / Supporting Documents</h2>
+                
+                <div class="file-upload" onclick="document.getElementById('fileInput').click()" ondrop="handleDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
+                    <div class="upload-icon">📎</div>
+                    <div class="upload-text">Drag and drop files here</div>
+                    <div class="upload-hint">or click to browse</div>
+                    <input type="file" id="fileInput" class="file-input" multiple accept=".pdf,.jpg,.jpeg,.png" onchange="handleFileSelect(event)">
+                </div>
+            </div>
+            
+            <!-- Submit Section -->
+            <div class="submit-section">
+                <div class="total-claimable">
+                    <div class="total-label">Total claimable:</div>
+                    <div class="total-amount">$0.00</div>
+                </div>
+                
+                <button type="submit" class="submit-btn">Submit</button>
+            </div>
+        </form>
+    </div>
+    
+    <script>
+        // Check if user is logged in
+        const userData = localStorage.getItem('user_data');
+        if (!userData) {
+            window.location.href = '/login';
+        }
+        
+        // Update total amount
+        document.getElementById('receiptAmount').addEventListener('input', function(e) {
+            const amount = parseFloat(e.target.value) || 0;
+            document.querySelector('.total-amount').textContent = `$${amount.toFixed(2)}`;
+        });
+        
+        // File upload handlers
+        function handleDragOver(event) {
+            event.preventDefault();
+            event.currentTarget.classList.add('dragover');
+        }
+        
+        function handleDragLeave(event) {
+            event.currentTarget.classList.remove('dragover');
+        }
+        
+        function handleDrop(event) {
+            event.preventDefault();
+            event.currentTarget.classList.remove('dragover');
+            const files = event.dataTransfer.files;
+            handleFiles(files);
+        }
+        
+        function handleFileSelect(event) {
+            const files = event.target.files;
+            handleFiles(files);
+        }
+        
+        function handleFiles(files) {
+            console.log('Files selected:', files);
+            if (files.length > 0) {
+                alert(`${files.length} file(s) uploaded successfully`);
+            }
+        }
+        
+        // Form submission
+        document.getElementById('claimForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            if (!document.getElementById('confirmInfo').checked) {
+                alert('Please confirm that you have read and agree to the terms and conditions.');
+                return;
+            }
+            
+            alert('Claim submitted successfully! You will receive a confirmation email shortly.');
+            window.location.href = '/dashboard';
+        });
+    </script>
+</body>
+</html>

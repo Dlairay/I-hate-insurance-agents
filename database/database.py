@@ -1,6 +1,7 @@
 """
 database.py
 ===========
+python -m uvicorn insurance_backend.insurance_backend_mongo:app --host 0.0.0.0 --port 8000 --reload
 MongoDB connection and models for insurance data
 """
 
@@ -39,6 +40,7 @@ class Collections:
     QUESTIONNAIRE_SESSIONS = "questionnaire_sessions"  # Store completed questionnaires
     PDF_EXTRACTIONS = "pdf_extractions"  # Store PDF processing results
     POLICY_SCORES = "policy_scores"  # Store scoring results
+    USERS = "users"  # User accounts for demo auth
 
 
 # Helper class for ObjectId handling
@@ -297,10 +299,31 @@ class PolicyScoreRecord(MongoBaseModel):
     plan_name: str
     monthly_premium: float
     coverage_amount: float
+
+
+class User(MongoBaseModel):
+    """Simple user account for demo auth"""
+    user_id: str = Field(..., unique=True)
+    email: str = Field(..., unique=True)
+    full_name: str
     
-    # Scoring metadata
-    scoring_version: str = "v1"
-    scoring_weights: Dict[str, float]
+    # Minimal demo auth - plain text password (NOT for production!)
+    password: str  # In production, this would be hashed
+    
+    # Profile data
+    profile_data: Optional[Dict[str, Any]] = {}  # Store JSON profile uploads
+    
+    # Account status
+    is_active: bool = True
+    last_login: Optional[datetime] = None
+    
+    # Linked data
+    customer_id: Optional[str] = None  # Link to CustomerProfile
+    purchased_policies: List[str] = []  # List of policy IDs
+    
+    def verify_password(self, password: str) -> bool:
+        """Simple password verification for demo"""
+        return self.password == password
 
 
 class Claim(MongoBaseModel):

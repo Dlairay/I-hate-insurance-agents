@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Up - Clearcover</title>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-image: url('/static/images/background_img.png');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* Navigation */
+        .navbar {
+            background: transparent;
+            padding: 1.5rem 3rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .logo-container img {
+            height: 40px;
+            width: 40px;
+        }
+        
+        .logo-text {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+            align-items: center;
+        }
+        
+        .nav-links a {
+            color: #666;
+            text-decoration: none;
+            font-size: 0.95rem;
+            transition: color 0.3s;
+        }
+        
+        .nav-links a:hover {
+            color: #333;
+        }
+        
+        .login-nav-btn {
+            background: #5ECDB9;
+            color: white;
+            padding: 0.5rem 1.5rem;
+            border-radius: 25px;
+            text-decoration: none;
+            transition: all 0.3s;
+        }
+        
+        .login-nav-btn:hover {
+            background: #4DB8A3;
+        }
+        
+        /* Main Container */
+        .main-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+        
+        /* Sign Up Card */
+        .signup-card {
+            background: white;
+            border-radius: 20px;
+            padding: 3rem;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 400px;
+            animation: fadeInUp 0.6s ease;
+        }
+        
+        .form-title {
+            font-size: 1.8rem;
+            font-weight: 600;
+            color: #333;
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        
+        /* Form Groups */
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        
+        .form-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #666;
+            font-size: 0.9rem;
+        }
+        
+        .form-input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.3s;
+        }
+        
+        .form-input:focus {
+            outline: none;
+            border-color: #5ECDB9;
+        }
+        
+        /* Submit Button */
+        .submit-btn {
+            width: 100%;
+            padding: 0.9rem;
+            background: #5ECDB9;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 1rem;
+        }
+        
+        .submit-btn:hover {
+            background: #4DB8A3;
+            transform: translateY(-1px);
+        }
+        
+        /* Toggle Link */
+        .toggle-section {
+            text-align: center;
+            margin-top: 1.5rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid #eee;
+        }
+        
+        .toggle-text {
+            color: #666;
+            font-size: 0.9rem;
+        }
+        
+        .toggle-link {
+            color: #5ECDB9;
+            text-decoration: none;
+            font-weight: 500;
+            cursor: pointer;
+        }
+        
+        .toggle-link:hover {
+            text-decoration: underline;
+        }
+        
+        /* Error and Success Messages */
+        .message {
+            padding: 0.75rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            display: none;
+        }
+        
+        .message.error {
+            background: #ffebee;
+            color: #c62828;
+            border: 1px solid #ffcdd2;
+        }
+        
+        .message.success {
+            background: #e8f5e9;
+            color: #2e7d32;
+            border: 1px solid #c8e6c9;
+        }
+        
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .navbar {
+                padding: 1rem 1.5rem;
+            }
+            
+            .nav-links a:not(.login-nav-btn) {
+                display: none;
+            }
+            
+            .signup-card {
+                padding: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="logo-container">
+            <img src="/static/images/logo.png" alt="Clearcover">
+            <span class="logo-text">Clearcover</span>
+        </div>
+        
+        <div class="nav-links">
+            <a href="/">About Us</a>
+            <a href="/claims">Claims</a>
+            <a href="#support">Support</a>
+            <a href="#" class="login-nav-btn" id="navLoginBtn">Log In</a>
+        </div>
+    </nav>
+    
+    <!-- Main Container -->
+    <div class="main-container">
+        <div class="signup-card">
+            <h2 class="form-title" id="formTitle">Sign up</h2>
+            
+            <div class="message error" id="errorMessage"></div>
+            <div class="message success" id="successMessage"></div>
+            
+            <!-- Sign Up Form -->
+            <form id="signupForm" style="display: block;">
+                <div class="form-group">
+                    <label class="form-label">Email</label>
+                    <input type="email" class="form-input" id="signupEmail" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Username</label>
+                    <input type="text" class="form-input" id="signupUsername" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Password</label>
+                    <input type="password" class="form-input" id="signupPassword" required>
+                </div>
+                
+                <button type="submit" class="submit-btn">Sign Up</button>
+            </form>
+            
+            <!-- Login Form -->
+            <form id="loginForm" style="display: none;">
+                <div class="form-group">
+                    <label class="form-label">Email</label>
+                    <input type="email" class="form-input" id="loginEmail" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Password</label>
+                    <input type="password" class="form-input" id="loginPassword" required>
+                </div>
+                
+                <button type="submit" class="submit-btn">Login</button>
+            </form>
+            
+            <div class="toggle-section">
+                <span class="toggle-text" id="toggleText">Already have an account?</span>
+                <a class="toggle-link" id="toggleLink">Click here to log in</a>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Form toggle functionality
+        const signupForm = document.getElementById('signupForm');
+        const loginForm = document.getElementById('loginForm');
+        const formTitle = document.getElementById('formTitle');
+        const toggleText = document.getElementById('toggleText');
+        const toggleLink = document.getElementById('toggleLink');
+        const navLoginBtn = document.getElementById('navLoginBtn');
+        const errorMessage = document.getElementById('errorMessage');
+        const successMessage = document.getElementById('successMessage');
+        
+        function showLogin() {
+            signupForm.style.display = 'none';
+            loginForm.style.display = 'block';
+            formTitle.textContent = 'Login';
+            toggleText.textContent = "Don't have an account? ";
+            toggleLink.textContent = 'Sign up here';
+            clearMessages();
+        }
+        
+        function showSignup() {
+            signupForm.style.display = 'block';
+            loginForm.style.display = 'none';
+            formTitle.textContent = 'Sign up';
+            toggleText.textContent = 'Already have an account? ';
+            toggleLink.textContent = 'Click here to log in';
+            clearMessages();
+        }
+        
+        function clearMessages() {
+            errorMessage.style.display = 'none';
+            successMessage.style.display = 'none';
+            errorMessage.textContent = '';
+            successMessage.textContent = '';
+        }
+        
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.style.display = 'block';
+            successMessage.style.display = 'none';
+        }
+        
+        function showSuccess(message) {
+            successMessage.textContent = message;
+            successMessage.style.display = 'block';
+            errorMessage.style.display = 'none';
+        }
+        
+        toggleLink.addEventListener('click', function() {
+            if (signupForm.style.display === 'block') {
+                showLogin();
+            } else {
+                showSignup();
+            }
+        });
+        
+        navLoginBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            showLogin();
+        });
+        
+        // Handle signup form submission
+        signupForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            clearMessages();
+            
+            const email = document.getElementById('signupEmail').value;
+            const username = document.getElementById('signupUsername').value;
+            const password = document.getElementById('signupPassword').value;
+            
+            // For now, just store in localStorage and redirect
+            const userData = {
+                email: email,
+                username: username,
+                full_name: username,
+                id: Date.now().toString()
+            };
+            
+            localStorage.setItem('user_data', JSON.stringify(userData));
+            showSuccess('Registration successful! Redirecting...');
+            
+            setTimeout(() => {
+                window.location.href = '/profile-creation';
+            }, 1500);
+        });
+        
+        // Handle login form submission
+        loginForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            clearMessages();
+            
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+            
+            // For now, just store in localStorage and redirect
+            const userData = {
+                email: email,
+                full_name: email.split('@')[0],
+                id: Date.now().toString()
+            };
+            
+            localStorage.setItem('user_data', JSON.stringify(userData));
+            showSuccess('Login successful! Redirecting...');
+            
+            setTimeout(() => {
+                window.location.href = '/dashboard';
+            }, 1500);
+        });
+        
+        // Check URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('mode') === 'login') {
+            showLogin();
+        }
+    </script>
+</body>
+</html>

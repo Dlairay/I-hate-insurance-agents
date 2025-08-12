@@ -25,8 +25,8 @@ from google.genai import types
 from google.adk.models.lite_llm import LiteLlm
 from dotenv import load_dotenv
 
-from shared.models import ApplicantProfile
-from agents.scoring_agent import get_scoring_agent, PolicyScore, QuotePlan
+from backend.shared.models import ApplicantProfile
+from backend.agents.scoring_agent import get_scoring_agent, PolicyScore, QuotePlan
 
 # Load environment variables
 load_dotenv()

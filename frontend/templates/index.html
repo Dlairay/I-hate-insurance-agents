@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clearcover - Insurance made easy, just for you!</title>
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/static/css/style.css">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-image: url('/static/images/background_img.png');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* Navigation */
+        .navbar {
+            background: transparent;
+            padding: 1.5rem 3rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .logo-container img {
+            height: 40px;
+            width: 40px;
+        }
+        
+        .logo-text {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+            align-items: center;
+        }
+        
+        .nav-links a {
+            color: #666;
+            text-decoration: none;
+            font-size: 0.95rem;
+            transition: color 0.3s;
+        }
+        
+        .nav-links a:hover {
+            color: #333;
+        }
+        
+        .login-btn {
+            background: #5ECDB9;
+            color: white;
+            padding: 0.5rem 1.5rem;
+            border-radius: 25px;
+            text-decoration: none;
+            transition: all 0.3s;
+        }
+        
+        .login-btn:hover {
+            background: #4DB8A3;
+        }
+        
+        /* Hero Section */
+        .hero-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+        
+        .hero-content {
+            text-align: center;
+            max-width: 600px;
+        }
+        
+        .hero-title {
+            font-size: 3.5rem;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 0.5rem;
+            line-height: 1.2;
+        }
+        
+        .hero-title .highlight {
+            color: #5ECDB9;
+        }
+        
+        .hero-subtitle {
+            font-size: 1.1rem;
+            color: #666;
+            margin-bottom: 2.5rem;
+            line-height: 1.6;
+        }
+        
+        .get-insured-btn {
+            background: #5ECDB9;
+            color: white;
+            padding: 1rem 2.5rem;
+            border: none;
+            border-radius: 30px;
+            font-size: 1.1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(94, 205, 185, 0.3);
+        }
+        
+        .get-insured-btn:hover {
+            background: #4DB8A3;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(94, 205, 185, 0.4);
+        }
+        
+        /* Background overlay for better content readability */
+        .gradient-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(232, 245, 243, 0.8);
+            z-index: -1;
+        }
+        
+        /* Center card */
+        .main-card {
+            background: white;
+            border-radius: 20px;
+            padding: 4rem;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+            animation: fadeInUp 0.6s ease;
+        }
+        
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .navbar {
+                padding: 1rem 1.5rem;
+            }
+            
+            .nav-links {
+                gap: 1rem;
+            }
+            
+            .nav-links a:not(.login-btn) {
+                display: none;
+            }
+            
+            .hero-title {
+                font-size: 2.5rem;
+            }
+            
+            .main-card {
+                padding: 2rem;
+                margin: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="gradient-bg"></div>
+    
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="logo-container">
+            <img src="/static/images/logo.png" alt="Clearcover">
+            <span class="logo-text">Clearcover</span>
+        </div>
+        
+        <div class="nav-links">
+            <a href="#about">About Us</a>
+            <a href="/claims">Claims</a>
+            <a href="#support">Support</a>
+            <a href="/login" class="login-btn">Log In</a>
+        </div>
+    </nav>
+    
+    <!-- Hero Section -->
+    <div class="hero-container">
+        <div class="main-card">
+            <div class="hero-content">
+                <h1 class="hero-title">
+                    Insurance made <span class="highlight">easy</span>,<br>
+                    just for you!
+                </h1>
+                <p class="hero-subtitle">
+                    An AI assistant that makes insurance simple and personalized
+                </p>
+                <button class="get-insured-btn" onclick="startInsuranceFlow()">
+                    Get Insured!
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        function startInsuranceFlow() {
+            const userData = localStorage.getItem('user_data');
+            
+            if (userData) {
+                window.location.href = '/questionnaire';
+            } else {
+                window.location.href = '/login';
+            }
+        }
+    </script>
+</body>
+</html>

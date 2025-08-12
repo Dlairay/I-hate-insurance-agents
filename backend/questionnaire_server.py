@@ -1,6 +1,7 @@
 """
 questionnaire/server.py
 =======================
+python -m uvicorn backend.questionnaire_server:app --host 0.0.0.0 --port 8001 --reload
 Questionnaire server that runs on port 8001
 """
 
@@ -8,32 +9,59 @@ from fastapi import FastAPI, HTTPException, Request, File, UploadFile
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
+from fastapi.middleware.cors import CORSMiddleware
 import uuid
 from datetime import datetime
 from typing import Dict, List, Any, Optional
 import json
+from pydantic import BaseModel
 
 import sys
 import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
-from shared.models import (
+# Simple demo auth models
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+class RegisterRequest(BaseModel):
+    email: str
+    password: str
+    full_name: str
+
+class AuthResponse(BaseModel):
+    success: bool
+    user_id: Optional[str] = None
+    message: str
+    user_data: Optional[Dict[str, Any]] = None
+
+from backend.shared.models import (
     QuestionnaireSession, QuestionnaireResponse, 
     ApplicantProfile, InsuranceRequest, ProductType,
     UserProfile, ExistingPolicyAssessment, NeedsEvaluationSchema, PolicyScore
 )
-from questionnaire.questions import INSURANCE_QUESTIONS, should_show_question
-from agents.questionnaire_agent import QuestionnaireHelper
-from agents.response_parser_agent import ResponseParser
-from agents.recommendation_agent import RecommendationEngine
-from agents.pdf_parser_agent import get_pdf_parser, PDFExtractionResult
-from agents.policy_analyzer_agent import analyze_existing_policy
-from agents.needs_evaluation_agent import get_needs_evaluation_agent
+from backend.questions import INSURANCE_QUESTIONS, should_show_question
+from backend.agents.option_selector_agent import QuestionnaireHelper
+from backend.agents.response_parser_agent import ResponseParser
+from backend.agents.recommendation_agent import RecommendationEngine
+from backend.agents.pdf_parser_agent import get_pdf_parser, PDFExtractionResult
+from backend.agents.policy_analyzer_agent import analyze_existing_policy
+from backend.agents.needs_evaluation_agent import get_needs_evaluation_agent
 
 app = FastAPI(
     title="Insurance Questionnaire Server",
     description="Interactive questionnaire with AI helpers",
     version="1.0.0"
+)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # In production, replace with specific origins
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Mount static files and templates
@@ -54,19 +82,89 @@ else:
     templates = None
     print(f"❌ Templates directory not found: {templates_dir}")
 
-# In-memory storage for sessions (in production, use database)
+# Database-persistent sessions instead of in-memory
 sessions: Dict[str, QuestionnaireSession] = {}
+
+async def save_session_to_db(session: QuestionnaireSession):
+    """Save session to database for persistence"""
+    try:
+        session_doc = {
+            "session_id": session.session_id,
+            "user_id": session.user_id,
+            "responses": [resp.dict() for resp in session.responses],
+            "completed": session.completed,
+            "current_question_index": session.current_question_index,
+            "created_at": session.created_at,
+            "updated_at": session.updated_at,
+            "metadata": session.metadata or {}
+        }
+        
+        await async_db[Collections.QUESTIONNAIRE_SESSIONS].replace_one(
+            {"session_id": session.session_id},
+            session_doc,
+            upsert=True
+        )
+    except Exception as e:
+        print(f"⚠️ Failed to save session to database: {e}")
+
+async def load_session_from_db(session_id: str) -> Optional[QuestionnaireSession]:
+    """Load session from database"""
+    try:
+        doc = await async_db[Collections.QUESTIONNAIRE_SESSIONS].find_one({"session_id": session_id})
+        if not doc:
+            return None
+            
+        # Reconstruct session object
+        session = QuestionnaireSession(session_id=session_id)
+        session.user_id = doc.get("user_id")
+        session.completed = doc.get("completed", False)
+        session.current_question_index = doc.get("current_question_index", 0)
+        session.created_at = doc.get("created_at")
+        session.updated_at = doc.get("updated_at")
+        session.metadata = doc.get("metadata", {})
+        
+        # Reconstruct responses
+        session.responses = []
+        for resp_data in doc.get("responses", []):
+            response = QuestionnaireResponse(
+                question_id=resp_data["question_id"],
+                answer=resp_data["answer"],
+                needs_help=resp_data.get("needs_help", False),
+                help_description=resp_data.get("help_description"),
+                ai_selected=resp_data.get("ai_selected", False)
+            )
+            session.responses.append(response)
+            
+        return session
+    except Exception as e:
+        print(f"⚠️ Failed to load session from database: {e}")
+        return None
+
+async def get_persistent_session(session_id: str) -> Optional[QuestionnaireSession]:
+    """Get session from memory or database"""
+    # Try memory first
+    if session_id in sessions:
+        return sessions[session_id]
+    
+    # Try database
+    session = await load_session_from_db(session_id)
+    if session:
+        sessions[session_id] = session
+    await save_session_to_db(session)  # Cache in memory
+    
+    return session
 
 # Import database models for persistence
 import sys
 import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
-from backend.database import (
+from database.database import (
     async_db, Collections, QuestionnaireSessionRecord, 
-    PDFExtractionRecord, PolicyScoreRecord
+    PDFExtractionRecord, PolicyScoreRecord, User
 )
 import hashlib
+import uuid
 
 # AI agents will be initialized lazily
 questionnaire_helper = None
@@ -93,93 +191,307 @@ def get_recommendation_engine():
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    """Main questionnaire page"""
+    """Landing page"""
     if templates:
-        return templates.TemplateResponse("questionnaire.html", {"request": request})
+        return templates.TemplateResponse("index.html", {"request": request})
     else:
         # Fallback HTML if templates not found
         return HTMLResponse("""
         <!DOCTYPE html>
         <html>
-        <head><title>Insurance Questionnaire</title></head>
+        <head><title>AI Insurance Broker</title></head>
         <body>
-            <h1>Insurance Questionnaire Demo</h1>
+            <h1>AI Insurance Broker</h1>
+            <p>Insurance made easy, just for you!</p>
             <p>Template files not found. API endpoints are still available at:</p>
             <ul>
                 <li><a href="/docs">API Documentation</a></li>
-                <li>POST /api/start-session - Start questionnaire</li>
+                <li><a href="/questionnaire">Questionnaire</a></li>
+                <li><a href="/login">Login</a></li>
             </ul>
         </body>
         </html>
         """)
+
+@app.get("/login", response_class=HTMLResponse)
+async def login_page(request: Request):
+    """Login page"""
+    if templates:
+        return templates.TemplateResponse("login.html", {"request": request})
+    else:
+        return HTMLResponse("<h1>Login page not available - templates not found</h1>")
+
+@app.get("/dashboard", response_class=HTMLResponse)  
+async def dashboard_page(request: Request):
+    """User dashboard page"""
+    if templates:
+        return templates.TemplateResponse("dashboard.html", {"request": request})
+    else:
+        return HTMLResponse("<h1>Dashboard page not available - templates not found</h1>")
+
+@app.get("/questionnaire", response_class=HTMLResponse)
+async def questionnaire_page(request: Request):
+    """Questionnaire page (alternative route)"""
+    if templates:
+        return templates.TemplateResponse("questionnaire.html", {"request": request})
+    else:
+        return HTMLResponse("<h1>Questionnaire page not available - templates not found</h1>")
+
+@app.get("/claims", response_class=HTMLResponse)
+async def claims_page(request: Request):
+    """Claims management page"""
+    if templates:
+        return templates.TemplateResponse("claims.html", {"request": request})
+    else:
+        return HTMLResponse("<h1>Claims page not available - templates not found</h1>")
 
 @app.post("/api/start-session")
 async def start_session():
     """Start a new questionnaire session"""
     session_id = str(uuid.uuid4())
     session = QuestionnaireSession(session_id=session_id)
-    sessions[session_id] = session
+    # Initialize user_profile as None - will be created when first answer submitted
+    session.user_profile = None
     
-    # Get the first question
-    first_question = INSURANCE_QUESTIONS[0]
+    # Track that no PDF was uploaded - auto-answer existing coverage questions
+    session.metadata = {"has_pdf_upload": False}
+    
+    # Auto-fill existing coverage questions since no PDF was uploaded
+    auto_responses = [
+        QuestionnaireResponse(
+            question_id="existing_coverage",
+            answer="none",
+            needs_help=False
+        ),
+        QuestionnaireResponse(
+            question_id="current_coverage_amount", 
+            answer="none",
+            needs_help=False
+        )
+    ]
+    session.responses.extend(auto_responses)
+    
+    sessions[session_id] = session
+    await save_session_to_db(session)
+    
+    # Find first unanswered question (skip auto-answered ones)
+    answered_question_ids = {resp.question_id for resp in session.responses}
+    first_unanswered_question = None
+    session.current_question_index = 0
+    
+    for i, question in enumerate(INSURANCE_QUESTIONS):
+        if question.id not in answered_question_ids:
+            first_unanswered_question = question
+            session.current_question_index = i
+            break
+    
+    # Update session with current index
+    sessions[session_id] = session
+    await save_session_to_db(session)
+    
+    # Calculate progress 
+    answered_count = len(session.responses)
+    total_questions = len(INSURANCE_QUESTIONS)
     
     return {
         "session_id": session_id,
-        "current_question": first_question.dict(),
-        "progress": {"current": 1, "total": len(INSURANCE_QUESTIONS)}
+        "current_question": first_unanswered_question.dict() if first_unanswered_question else None,
+        "progress": {"current": answered_count + 1, "total": total_questions},
+        "auto_answered": list(answered_question_ids)
     }
 
 @app.post("/api/start-session-with-profile")
 async def start_session_with_profile(profile_data: Dict[str, Any]):
     """Start questionnaire session with pre-filled profile data"""
+    print(f"DEBUG: Received profile_data: {profile_data}")
     session_id = str(uuid.uuid4())
     session = QuestionnaireSession(session_id=session_id)
+    # Initialize user_profile as None - will be created when first answer submitted
+    session.user_profile = None
     
-    # Pre-fill personal information from uploaded profile
-    personal_questions = [
-        ("personal_first_name", "first_name"),
-        ("personal_last_name", "last_name"), 
-        ("personal_dob", "dob"),
-        ("personal_gender", "gender"),
-        ("personal_email", "email"),
-        ("personal_phone", "phone"),
-        ("address_line1", "address_line1"),
-        ("address_city", "city"),
-        ("address_state", "state"),
-        ("address_postal_code", "postal_code")
+    # Track that no PDF was uploaded - auto-answer existing coverage questions
+    # Store the original profile data for later use
+    session.metadata = {"has_pdf_upload": False, "original_profile": profile_data}
+    
+    # Auto-fill questions based on profile data
+    auto_responses = []
+    
+    print(f"DEBUG: Profile data keys: {list(profile_data.keys())}")
+    print(f"DEBUG: Full profile data: {profile_data}")
+    
+    # Add personal information to session for ApplicantProfile conversion
+    personal_fields = {}
+    
+    # Handle name - split full_name into first and last
+    if "full_name" in profile_data:
+        name_parts = profile_data["full_name"].strip().split()
+        personal_fields["personal_first_name"] = name_parts[0] if name_parts else ""
+        personal_fields["personal_last_name"] = " ".join(name_parts[1:]) if len(name_parts) > 1 else ""
+        print(f"DEBUG: Split name '{profile_data['full_name']}' into first='{personal_fields['personal_first_name']}', last='{personal_fields['personal_last_name']}'")
+    
+    # Handle contact info
+    if "email" in profile_data:
+        personal_fields["personal_email"] = profile_data["email"]
+    if "phone" in profile_data:
+        personal_fields["personal_phone"] = profile_data["phone"]
+    
+    # Handle age and create DOB
+    age_str = ""
+    if "age" in profile_data:
+        age_str = str(profile_data["age"])
+        # Create approximate DOB from age
+        from datetime import date
+        current_year = date.today().year
+        birth_year = current_year - int(profile_data["age"])
+        personal_fields["personal_dob"] = f"{birth_year}-01-01"
+        print(f"DEBUG: Found age: {age_str}, created DOB: {personal_fields['personal_dob']}")
+    elif "dob" in profile_data:
+        personal_fields["personal_dob"] = profile_data["dob"]
+        from datetime import date
+        try:
+            birth = date.fromisoformat(profile_data["dob"])
+            today = date.today()
+            age = today.year - birth.year - ((today.month, today.day) < (birth.month, birth.day))
+            age_str = str(age)
+        except:
+            pass
+    
+    # Handle address - flatten nested address object
+    if "address" in profile_data:
+        addr = profile_data["address"]
+        if "street" in addr:
+            personal_fields["address_line1"] = addr["street"]
+        if "city" in addr:
+            personal_fields["address_city"] = addr["city"]
+        if "state" in addr:
+            personal_fields["address_state"] = addr["state"]
+        if "zip_code" in addr:
+            personal_fields["address_postal_code"] = addr["zip_code"]
+        print(f"DEBUG: Mapped address: {personal_fields}")
+    
+    # Store personal fields in session metadata for ApplicantProfile conversion
+    session.metadata.update({"personal_fields": personal_fields})
+    
+    # Handle income
+    income_str = ""
+    if "annual_income" in profile_data:
+        income_str = str(profile_data["annual_income"])
+        personal_fields["annual_income"] = float(profile_data["annual_income"])
+        print(f"DEBUG: Found annual_income: {income_str}")
+    
+    # Create basic_info response
+    if age_str or income_str:
+        combined_answer = f"{age_str} years old, income ${income_str}".strip()
+        print(f"DEBUG: Creating basic_info response: {combined_answer}")
+        auto_responses.append(QuestionnaireResponse(
+            question_id="basic_info",
+            answer=combined_answer,
+            needs_help=False
+        ))
+    else:
+        print("DEBUG: No age or income found, not creating basic_info response")
+    
+    # 2. Handle occupation mapping
+    if "occupation" in profile_data:
+        occupation = profile_data["occupation"].lower()
+        print(f"DEBUG: Found occupation: {occupation}")
+        occupation_mapping = {
+            "software engineer": "office_professional",
+            "engineer": "office_professional", 
+            "developer": "office_professional",
+            "programmer": "office_professional",
+            "analyst": "office_professional",
+            "manager": "office_professional",
+            "doctor": "healthcare",
+            "nurse": "healthcare",
+            "teacher": "education",
+            "professor": "education",
+            "instructor": "education",
+            "driver": "transportation",
+            "pilot": "transportation",
+            "construction": "construction",
+            "builder": "construction",
+            "police": "law_enforcement",
+            "officer": "law_enforcement",
+            "security": "law_enforcement"
+        }
+        
+        occupation_value = "other"  # default
+        for key, value in occupation_mapping.items():
+            if key in occupation:
+                occupation_value = value
+                break
+                
+        print(f"DEBUG: Mapped occupation '{occupation}' to '{occupation_value}'")
+        auto_responses.append(QuestionnaireResponse(
+            question_id="occupation",
+            answer=occupation_value,
+            needs_help=False
+        ))
+    
+    # 3. Handle smoking status from health_info (only basic health facts)
+    if "health_info" in profile_data and "smoker" in profile_data["health_info"]:
+        is_smoker = profile_data["health_info"]["smoker"]
+        smoking_answer = "yes_cigarettes" if is_smoker else "never"
+        auto_responses.append(QuestionnaireResponse(
+            question_id="smoking_vaping_habits",
+            answer=smoking_answer,
+            needs_help=False
+        ))
+    
+    # DO NOT auto-fill insurance preferences - that's what the questionnaire is for!
+    # Only auto-fill basic personal info to speed up the process
+    
+    # Add all auto-responses
+    print(f"DEBUG: Created {len(auto_responses)} auto-responses:")
+    for resp in auto_responses:
+        print(f"  - {resp.question_id}: {resp.answer}")
+    session.responses.extend(auto_responses)
+    
+    # Auto-fill existing coverage questions since no PDF was uploaded
+    auto_coverage_responses = [
+        QuestionnaireResponse(
+            question_id="existing_coverage",
+            answer="none",
+            needs_help=False
+        ),
+        QuestionnaireResponse(
+            question_id="current_coverage_amount", 
+            answer="none",
+            needs_help=False
+        )
     ]
+    session.responses.extend(auto_coverage_responses)
     
-    for question_id, profile_key in personal_questions:
-        if profile_key in profile_data:
-            response = QuestionnaireResponse(
-                question_id=question_id,
-                answer=profile_data[profile_key],
-                needs_help=False
-            )
-            session.responses.append(response)
-    
-    # Find first question after personal and address (should be lifestyle questions)
-    insurance_start_index = 0
-    skippable_categories = {"personal", "address"}
+    # Find first unanswered question
+    answered_question_ids = {resp.question_id for resp in session.responses}
+    session.current_question_index = 0
     
     for i, question in enumerate(INSURANCE_QUESTIONS):
-        if question.category not in skippable_categories:
-            insurance_start_index = i
+        if question.id not in answered_question_ids:
+            session.current_question_index = i
             break
     
-    session.current_question_index = insurance_start_index
     sessions[session_id] = session
+    await save_session_to_db(session)
     
-    # Get the first actual insurance question (lifestyle/priorities/etc)
-    current_question = INSURANCE_QUESTIONS[insurance_start_index]
+    # Get the current question (skipping answered ones)
+    if session.current_question_index < len(INSURANCE_QUESTIONS):
+        current_question = INSURANCE_QUESTIONS[session.current_question_index]
+    else:
+        current_question = None
     
-    # Calculate progress: only count the remaining questions (not the skipped ones)
-    total_insurance_questions = len([q for q in INSURANCE_QUESTIONS if q.category not in skippable_categories])
+    # Calculate progress based on actual remaining questions
+    total_questions = len(INSURANCE_QUESTIONS)
+    answered_count = len(session.responses)
+    remaining_questions = total_questions - answered_count
     
     return {
         "session_id": session_id,
-        "current_question": current_question.dict(),
-        "progress": {"current": 1, "total": total_insurance_questions}
+        "current_question": current_question.dict() if current_question else None,
+        "progress": {"current": answered_count + 1, "total": total_questions},
+        "skipped_questions": list(answered_question_ids),
+        "remaining_questions": remaining_questions
     }
 
 @app.post("/api/start-session-with-pdf")
@@ -217,16 +529,64 @@ async def start_session_with_pdf(
     )
     session = QuestionnaireSession(session_id=session_id)
     
-    # Store extraction result in session metadata
+    # Store extraction result in session metadata (convert Pydantic model to dict for MongoDB)
+    try:
+        extraction_dict = extraction_result.dict() if hasattr(extraction_result, 'dict') else extraction_result.__dict__
+    except Exception as e:
+        print(f"⚠️  Warning: Could not serialize PDF extraction result: {e}")
+        extraction_dict = {
+            "error": f"Serialization failed: {str(e)}",
+            "confidence_score": 0.0,
+            "extracted_fields": {}
+        }
+    
     session.metadata = {
-        "pdf_extraction": extraction_result.dict(),
+        "has_pdf_upload": True,
+        "pdf_extraction": extraction_dict,
         "pdf_filename": pdf_file.filename
     }
     
     # Pre-fill questions based on extracted data
     extracted_fields = extraction_result.extracted_fields
     
-    # Map extracted fields to questions
+    # Store extracted fields in session metadata for ApplicantProfile conversion (same pattern as JSON)
+    personal_fields = {}
+    
+    # Map PDF fields to personal fields format
+    pdf_to_personal_mappings = [
+        ("first_name", "personal_first_name"),
+        ("last_name", "personal_last_name"), 
+        ("dob", "personal_dob"),
+        ("gender", "personal_gender"),
+        ("email", "personal_email"),
+        ("phone", "personal_phone"),
+        ("address_line1", "address_line1"),
+        ("city", "address_city"),
+        ("state", "address_state"),
+        ("postal_code", "address_postal_code"),
+        ("annual_income", "annual_income"),
+    ]
+    
+    for pdf_field, personal_field in pdf_to_personal_mappings:
+        if pdf_field in extracted_fields:
+            personal_fields[personal_field] = extracted_fields[pdf_field]
+    
+    # Also merge with any JSON profile data
+    if json_profile and profile_data:
+        # Apply same JSON mapping logic to PDF case
+        if "full_name" in profile_data:
+            name_parts = profile_data["full_name"].strip().split()
+            personal_fields["personal_first_name"] = name_parts[0] if name_parts else personal_fields.get("personal_first_name", "")
+            personal_fields["personal_last_name"] = " ".join(name_parts[1:]) if len(name_parts) > 1 else personal_fields.get("personal_last_name", "")
+        
+        if "annual_income" in profile_data:
+            personal_fields["annual_income"] = float(profile_data["annual_income"])
+    
+    # Store in session metadata for ApplicantProfile conversion
+    session.metadata.update({"personal_fields": personal_fields})
+    print(f"DEBUG: Stored personal fields from PDF+JSON: {personal_fields}")
+    
+    # Map extracted fields to questionnaire responses (for questionnaire flow)
     field_mappings = [
         ("personal_first_name", "first_name"),
         ("personal_last_name", "last_name"), 
@@ -250,6 +610,77 @@ async def start_session_with_pdf(
             )
             session.responses.append(response)
     
+    # Handle existing coverage questions based on PDF extraction
+    if "existing_coverage_type" in extracted_fields or "policy_number" in extracted_fields:
+        # PDF contains existing coverage information - answer existing_coverage appropriately
+        if "existing_coverage_type" in extracted_fields:
+            coverage_type = extracted_fields["existing_coverage_type"].lower()
+            if "health" in coverage_type or "medical" in coverage_type:
+                existing_answer = "individual_basic"
+            elif "comprehensive" in coverage_type:
+                existing_answer = "individual_comprehensive"
+            elif "employer" in coverage_type:
+                existing_answer = "employer_only"
+            else:
+                existing_answer = "individual_basic"  # Default for any existing coverage
+        else:
+            existing_answer = "individual_basic"  # Has policy number, assume individual coverage
+        
+        coverage_responses = [
+            QuestionnaireResponse(
+                question_id="existing_coverage",
+                answer=existing_answer,
+                needs_help=False
+            )
+        ]
+        
+        # Try to determine coverage amount from PDF if available
+        if "coverage_amount" in extracted_fields:
+            amount = extracted_fields["coverage_amount"]
+            if isinstance(amount, str):
+                amount = amount.replace("$", "").replace(",", "")
+                try:
+                    amount_num = float(amount)
+                    if amount_num < 50000:
+                        amount_answer = "under_50k"
+                    elif amount_num < 100000:
+                        amount_answer = "50k_100k"
+                    elif amount_num < 250000:
+                        amount_answer = "100k_250k"
+                    elif amount_num < 500000:
+                        amount_answer = "250k_500k"
+                    else:
+                        amount_answer = "over_500k"
+                except:
+                    amount_answer = "50k_100k"  # Default moderate coverage
+            else:
+                amount_answer = "50k_100k"  # Default moderate coverage
+        else:
+            amount_answer = "50k_100k"  # Default when no amount in PDF
+        
+        coverage_responses.append(QuestionnaireResponse(
+            question_id="current_coverage_amount",
+            answer=amount_answer,
+            needs_help=False
+        ))
+        
+        session.responses.extend(coverage_responses)
+    else:
+        # PDF uploaded but no existing coverage found - user has no existing coverage
+        no_coverage_responses = [
+            QuestionnaireResponse(
+                question_id="existing_coverage",
+                answer="none",
+                needs_help=False
+            ),
+            QuestionnaireResponse(
+                question_id="current_coverage_amount",
+                answer="none",
+                needs_help=False
+            )
+        ]
+        session.responses.extend(no_coverage_responses)
+    
     # Find first unanswered question
     answered_question_ids = {resp.question_id for resp in session.responses}
     first_unanswered_index = 0
@@ -261,6 +692,7 @@ async def start_session_with_pdf(
     
     session.current_question_index = first_unanswered_index
     sessions[session_id] = session
+    await save_session_to_db(session)
     
     # Get the first unanswered question
     current_question = INSURANCE_QUESTIONS[first_unanswered_index] if first_unanswered_index < len(INSURANCE_QUESTIONS) else None
@@ -311,12 +743,11 @@ async def parse_pdf_only(
     }
 
 @app.get("/api/session/{session_id}")
-async def get_session(session_id: str):
+async def get_session_endpoint(session_id: str):
     """Get current session state"""
-    if session_id not in sessions:
+    session = await get_persistent_session(session_id)
+    if not session:
         raise HTTPException(status_code=404, detail="Session not found")
-    
-    session = sessions[session_id]
     current_question = get_current_question(session)
     
     return {
@@ -328,10 +759,9 @@ async def get_session(session_id: str):
 @app.post("/api/session/{session_id}/answer")
 async def submit_answer(session_id: str, answer_data: Dict[str, Any]):
     """Submit an answer to the current question"""
-    if session_id not in sessions:
+    session = await get_persistent_session(session_id)
+    if not session:
         raise HTTPException(status_code=404, detail="Session not found")
-    
-    session = sessions[session_id]
     current_question = get_current_question(session)
     
     if not current_question:
@@ -374,12 +804,18 @@ async def submit_answer(session_id: str, answer_data: Dict[str, Any]):
     
     print(f"Schema update: {current_question.id} = {response.answer}")  # Debug
     
-    # Move to next appropriate question (skip conditional questions)
-    while (session.current_question_index < len(INSURANCE_QUESTIONS) and 
-           not should_show_question(
-               INSURANCE_QUESTIONS[session.current_question_index], 
-               get_response_dict(session)
-           )):
+    # Get all answered question IDs (including auto-answered ones)
+    answered_question_ids = {r.question_id for r in session.responses}
+    
+    # Move to next unanswered question (skip both auto-answered and conditional questions)
+    while session.current_question_index < len(INSURANCE_QUESTIONS):
+        next_question = INSURANCE_QUESTIONS[session.current_question_index]
+        
+        # Skip if question was already answered (auto-answered) or shouldn't be shown
+        if (next_question.id not in answered_question_ids and 
+            should_show_question(next_question, get_response_dict(session))):
+            break
+            
         session.current_question_index += 1
     
     # Check if questionnaire is complete
@@ -388,13 +824,19 @@ async def submit_answer(session_id: str, answer_data: Dict[str, Any]):
         
         # Process completed questionnaire with agentic approach
         try:
+            print("DEBUG: Starting questionnaire completion processing...")
             insurance_response = await process_completed_questionnaire_agentic(session)
+            print("DEBUG: Successfully processed completed questionnaire")
             return {
                 "completed": True,
+                "redirect_to": f"/recommendations?session={session.session_id}",
                 "insurance_response": insurance_response,
                 "progress": {"current": len(INSURANCE_QUESTIONS), "total": len(INSURANCE_QUESTIONS)}
             }
         except Exception as e:
+            print(f"DEBUG: Error processing completed questionnaire: {str(e)}")
+            import traceback
+            print(f"DEBUG: Full traceback: {traceback.format_exc()}")
             raise HTTPException(status_code=500, detail=f"Error processing questionnaire: {str(e)}")
     
     # Get next question
@@ -406,13 +848,40 @@ async def submit_answer(session_id: str, answer_data: Dict[str, Any]):
         "progress": calculate_progress(session)
     }
 
+@app.post("/api/session/{session_id}/back")
+async def go_back_question(session_id: str):
+    """Go back to the previous question"""
+    session = await get_persistent_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    # Can't go back if we're at the first question
+    if session.current_question_index <= 0:
+        raise HTTPException(status_code=400, detail="Already at the first question")
+    
+    # Remove the last response
+    if session.responses:
+        last_response = session.responses.pop()
+        print(f"🔙 Removed response for question: {last_response.question_id}")
+    
+    # Move back to the previous question
+    session.current_question_index -= 1
+    
+    # Get the previous question
+    current_question = get_current_question(session)
+    
+    return {
+        "success": True,
+        "current_question": current_question.dict() if current_question else None,
+        "progress": calculate_progress(session)
+    }
+
 @app.post("/api/session/{session_id}/get-help")
 async def get_question_help(session_id: str, help_request: Dict[str, str]):
     """Get AI help for answering a question or general insurance guidance"""
-    if session_id not in sessions:
+    session = await get_persistent_session(session_id)
+    if not session:
         raise HTTPException(status_code=404, detail="Session not found")
-    
-    session = sessions[session_id]
     current_question = get_current_question(session)
     user_description = help_request.get("description", "")
     
@@ -457,6 +926,142 @@ async def get_question_help(session_id: str, help_request: Dict[str, str]):
             "confidence": 0.6
         }
 
+@app.post("/api/session/{session_id}/add-pdf")  
+async def add_pdf_to_session(
+    session_id: str,
+    pdf_file: UploadFile = File(...)
+):
+    """Add PDF data to existing questionnaire session"""
+    print(f"DEBUG: Adding PDF to existing session {session_id}")
+    
+    # Get existing session
+    session = await get_persistent_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    # Validate PDF file
+    if not pdf_file.filename.lower().endswith('.pdf'):
+        raise HTTPException(status_code=400, detail="File must be a PDF")
+    
+    # Read PDF content
+    pdf_content = await pdf_file.read()
+    
+    try:
+        # Process PDF using the existing agent
+        from backend.agents.pdf_parser_agent import PDFParserAgent
+        pdf_agent = PDFParserAgent()
+        
+        # Extract from PDF with existing profile context
+        existing_profile = session.metadata.get("original_profile", {}) if session.metadata else {}
+        print(f"DEBUG: Existing profile context: {existing_profile}")
+        
+        # Use the correct method name and parameter
+        extraction_result = await pdf_agent.extract_insurance_fields_async(
+            pdf_content, 
+            json_profile=existing_profile
+        )
+        print(f"DEBUG: PDF extraction result: {extraction_result}")
+        
+        # Save PDF extraction to database
+        extraction_id = await save_pdf_extraction(
+            session_id, pdf_file.filename, pdf_content, extraction_result
+        )
+        
+        # Update session metadata to indicate PDF was processed
+        if not session.metadata:
+            session.metadata = {}
+        
+        # Convert extraction result to dict for MongoDB storage
+        try:
+            extraction_dict = extraction_result.dict() if hasattr(extraction_result, 'dict') else extraction_result.__dict__
+        except Exception as e:
+            print(f"⚠️  Warning: Could not serialize PDF extraction result: {e}")
+            extraction_dict = {"error": f"Serialization failed: {str(e)}"}
+        
+        session.metadata["has_pdf_upload"] = True
+        session.metadata["pdf_extraction_id"] = extraction_id
+        session.metadata["pdf_extraction"] = extraction_dict
+        
+        # Create personal fields from PDF extraction (same pattern as other endpoints)
+        extracted_fields = extraction_result.extracted_fields
+        personal_fields = session.metadata.get("personal_fields", {})
+        
+        # Map PDF fields to personal fields format
+        pdf_to_personal_mappings = [
+            ("first_name", "personal_first_name"),
+            ("last_name", "personal_last_name"), 
+            ("dob", "personal_dob"),
+            ("gender", "personal_gender"),
+            ("email", "personal_email"),
+            ("phone", "personal_phone"),
+            ("address_line1", "address_line1"),
+            ("city", "address_city"),
+            ("state", "address_state"),
+            ("postal_code", "address_postal_code"),
+            ("annual_income", "annual_income"),
+        ]
+        
+        for pdf_field, personal_field in pdf_to_personal_mappings:
+            if pdf_field in extracted_fields:
+                personal_fields[personal_field] = extracted_fields[pdf_field]
+        
+        session.metadata["personal_fields"] = personal_fields
+        print(f"DEBUG: Updated personal fields with PDF data: {personal_fields}")
+        
+        # Update the existing coverage questions based on PDF data
+        # Convert Pydantic model to dict if needed
+        extracted_data = extraction_result.extracted_fields if hasattr(extraction_result, 'extracted_fields') else extraction_result
+        
+        if extracted_data.get("has_existing_coverage"):
+            print("DEBUG: PDF shows existing coverage, updating responses...")
+            # Find and update existing coverage responses that were set to "none"
+            for response in session.responses:
+                if response.question_id == "existing_coverage" and response.answer == "none":
+                    response.answer = "employer_comprehensive"
+                    print(f"DEBUG: Updated existing_coverage from 'none' to 'employer_comprehensive'")
+                elif response.question_id == "current_coverage_amount" and response.answer == "none":
+                    coverage = extracted_data.get("coverage_amount", "")
+                    if "$1,000,000" in coverage:
+                        response.answer = "over_500k"
+                        print(f"DEBUG: Updated current_coverage_amount from 'none' to 'over_500k'")
+        
+        # Save updated session
+        sessions[session_id] = session
+        await save_session_to_db(session)
+        
+        # Get current question (should skip more now)
+        answered_question_ids = {resp.question_id for resp in session.responses}
+        current_question_index = 0
+        
+        for i, question in enumerate(INSURANCE_QUESTIONS):
+            if question.id not in answered_question_ids:
+                current_question_index = i
+                break
+        
+        current_question = INSURANCE_QUESTIONS[current_question_index] if current_question_index < len(INSURANCE_QUESTIONS) else None
+        total_questions = len(INSURANCE_QUESTIONS)
+        answered_count = len(session.responses)
+        
+        print(f"DEBUG: After PDF processing - answered {answered_count} questions, current question: {current_question.id if current_question else 'None'}")
+        
+        return {
+            "success": True,
+            "session_id": session_id,
+            "pdf_extraction_result": {
+                "extraction_id": extraction_id,
+                "confidence_score": getattr(extraction_result, 'confidence_score', 0),
+                "extracted_fields": extracted_data
+            },
+            "current_question": current_question.dict() if current_question else None,
+            "progress": {"current": answered_count + 1, "total": total_questions},
+            "skipped_questions": list(answered_question_ids),
+            "remaining_questions": total_questions - answered_count
+        }
+        
+    except Exception as e:
+        print(f"DEBUG: PDF processing error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to process PDF: {str(e)}")
+
 # Helper functions
 def calculate_progress(session: QuestionnaireSession) -> Dict[str, int]:
     """Calculate progress for a session, accounting for skipped questions"""
@@ -495,6 +1100,7 @@ def get_current_question(session: QuestionnaireSession):
 def get_response_dict(session: QuestionnaireSession) -> Dict[str, Any]:
     """Convert session responses to dictionary for easy lookup"""
     return {r.question_id: r.answer for r in session.responses}
+
 
 async def save_completed_session(session: QuestionnaireSession, applicant: ApplicantProfile, 
                                  source: str = "manual", pdf_info: Optional[Dict] = None):
@@ -591,12 +1197,12 @@ async def process_completed_questionnaire(session: QuestionnaireSession) -> Dict
     
     # For MVP: Handle simplified 8-question format
     if is_mvp_questionnaire(responses):
-        return await process_mvp_questionnaire(responses)
+        return await process_mvp_questionnaire(responses, session)
     
     # Legacy: Handle original 25-question format
     return await process_legacy_questionnaire(responses)
 
-async def process_mvp_questionnaire(responses: Dict[str, Any]) -> Dict[str, Any]:
+async def process_mvp_questionnaire(responses: Dict[str, Any], session: QuestionnaireSession = None) -> Dict[str, Any]:
     """Process the simplified 8-question MVP questionnaire"""
     
     # Parse MVP responses
@@ -628,8 +1234,15 @@ async def process_mvp_questionnaire(responses: Dict[str, Any]) -> Dict[str, Any]
             primary_need=primary_need
         )
     
+    # Extract gender from original profile if available
+    gender = "OTHER"  # Default
+    if hasattr(session, 'metadata') and session.metadata and 'original_profile' in session.metadata:
+        original_profile = session.metadata['original_profile']
+        gender = original_profile.get('gender', 'OTHER')
+        print(f"🔍 Found original profile gender: {gender}")
+    
     # Create minimal applicant profile for API
-    applicant = create_minimal_applicant(age, annual_income, health_status)
+    applicant = create_minimal_applicant(age, annual_income, health_status, gender)
     
     # Determine if user needs new coverage or optimization
     should_get_quotes = should_fetch_new_quotes(policy_analysis, primary_need, existing_coverage)
@@ -648,7 +1261,7 @@ async def process_mvp_questionnaire(responses: Dict[str, Any]) -> Dict[str, Any]
         # Create insurance request
         insurance_request = InsuranceRequest(
             product_type=product_type,
-            applicant=applicant,
+            applicant=applicant.model_dump() if hasattr(applicant, 'model_dump') else applicant,
             coverage_amount=target_coverage,
             deductible=None,
             term_years=None,
@@ -672,7 +1285,7 @@ async def process_legacy_questionnaire(responses: Dict[str, Any]) -> Dict[str, A
     
     # Convert responses to ApplicantProfile
     try:
-        applicant = convert_responses_to_applicant(responses)
+        applicant = convert_responses_to_applicant(responses, session)
     except Exception as e:
         raise Exception(f"Error converting responses to applicant profile: {str(e)}")
     
@@ -683,7 +1296,7 @@ async def process_legacy_questionnaire(responses: Dict[str, Any]) -> Dict[str, A
     # Create insurance request
     insurance_request = InsuranceRequest(
         product_type=product_type,
-        applicant=applicant,
+        applicant=applicant.model_dump() if hasattr(applicant, 'model_dump') else applicant,
         coverage_amount=coverage_amount,
         deductible=None,  # Let insurance companies suggest appropriate deductibles
         term_years=None,  # Let insurance companies suggest appropriate terms
@@ -701,10 +1314,40 @@ async def process_legacy_questionnaire(responses: Dict[str, Any]) -> Dict[str, A
 async def fetch_insurance_quotes(insurance_request: InsuranceRequest, responses: Dict[str, Any]) -> Dict[str, Any]:
     """Fetch quotes from insurance API"""
     import httpx
+    
+    # Convert ApplicantProfile to ApplicantData format expected by backend
+    request_data = insurance_request.model_dump()
+    
+    # Map ApplicantProfile fields to ApplicantData fields
+    if "applicant" in request_data and isinstance(request_data["applicant"], dict):
+        applicant = request_data["applicant"]
+        
+        # Ensure required fields are present with defaults if missing
+        applicant_data = {
+            "first_name": applicant.get("first_name", "Unknown"),
+            "last_name": applicant.get("last_name", "User"),
+            "dob": applicant.get("dob", "1990-01-01"),
+            "gender": applicant.get("gender", "OTHER"),
+            "email": applicant.get("email", "user@example.com"),
+            "phone": applicant.get("phone", "000-000-0000"),
+            "address_line1": applicant.get("address_line1", "123 Main St"),
+            "address_line2": applicant.get("address_line2"),
+            "city": applicant.get("city", "Anytown"),
+            "state": applicant.get("state", "CA"),
+            "postal_code": applicant.get("postal_code", "00000"),
+        }
+        
+        # Copy additional fields that exist in both models
+        for field in ["annual_income", "occupation", "health_status", "smoker_status"]:
+            if field in applicant:
+                applicant_data[field] = applicant[field]
+        
+        request_data["applicant"] = applicant_data
+    
     async with httpx.AsyncClient() as client:
         response = await client.post(
             "http://localhost:8000/v1/quote",
-            json=insurance_request.dict(),
+            json=request_data,
             timeout=30.0
         )
         response.raise_for_status()
@@ -795,7 +1438,7 @@ def estimate_current_premium(coverage_type: str, budget: str, annual_income: flo
     
     return base_premium
 
-def create_minimal_applicant(age: int, annual_income: float, health_status: str) -> ApplicantProfile:
+def create_minimal_applicant(age: int, annual_income: float, health_status: str, gender: str = "OTHER") -> ApplicantProfile:
     """Create minimal applicant profile for API call"""
     from datetime import date
     
@@ -810,7 +1453,7 @@ def create_minimal_applicant(age: int, annual_income: float, health_status: str)
         first_name="User",
         last_name="Person", 
         dob=f"{birth_year}-01-01",
-        gender="OTHER",
+        gender=gender,
         email="user@example.com",
         phone="000-000-0000",
         address_line1="123 Main St",
@@ -947,24 +1590,105 @@ def populate_user_profile_field(session: QuestionnaireSession, question_id: str,
     # Parse basic_info if it's the combined field
     if question_id == "basic_info" and isinstance(answer_value, str):
         age, income = parse_basic_info_direct(answer_value)
-        session.user_profile.age = age
-        session.user_profile.annual_income = income
+        
+        # Initialize user profile with defaults if not exists
+        if session.user_profile is None:
+            from shared.models import UserProfile
+            session.user_profile = UserProfile(
+                age=age,
+                annual_income=income,
+                health_status="good",
+                existing_coverage_type="none", 
+                existing_coverage_amount="none",
+                primary_need="first_time",
+                monthly_budget="show_all",
+                coverage_priority="unsure",
+                urgency="exploring",
+                
+                # New lifestyle and risk factor fields with defaults
+                occupation="office_professional",
+                smoking_status="never",
+                alcohol_consumption="social", 
+                exercise_frequency="weekly",
+                high_risk_activities=["none"],
+                monthly_premium_budget="flexible",
+                desired_add_ons=["none"]
+            )
+        else:
+            session.user_profile.age = age
+            session.user_profile.annual_income = income
         return
     
-    # Direct field mappings for MVP questionnaire
+    # Direct field mappings for enhanced 15-question questionnaire
     field_mappings = {
+        # Original 8 questions
         "existing_coverage": "existing_coverage_type",
         "current_coverage_amount": "existing_coverage_amount", 
         "health_status": "health_status",
         "primary_need": "primary_need",
         "budget": "monthly_budget",
         "coverage_priority": "coverage_priority", 
-        "timeline": "urgency"
+        "timeline": "urgency",
+        
+        # New lifestyle and risk factor questions
+        "occupation": "occupation",
+        "smoking_vaping_habits": "smoking_status", 
+        "alcohol_consumption": "alcohol_consumption",
+        "exercise_frequency": "exercise_frequency",
+        "high_risk_activities": "high_risk_activities",
+        "monthly_premium_budget": "monthly_premium_budget",
+        "desired_add_ons": "desired_add_ons"
     }
     
     if question_id in field_mappings:
+        # Initialize profile with defaults if not exists
+        if session.user_profile is None:
+            from shared.models import UserProfile
+            session.user_profile = UserProfile(
+                age=30,  # Default age
+                annual_income=50000.0,  # Default income
+                health_status="good",
+                existing_coverage_type="none", 
+                existing_coverage_amount="none",
+                primary_need="first_time",
+                monthly_budget="show_all",
+                coverage_priority="unsure",
+                urgency="exploring",
+                
+                # New lifestyle and risk factor fields with defaults
+                occupation="office_professional",
+                smoking_status="never",
+                alcohol_consumption="social", 
+                exercise_frequency="weekly",
+                high_risk_activities=["none"],
+                monthly_premium_budget="flexible",
+                desired_add_ons=["none"]
+            )
+        
         profile_field = field_mappings[question_id]
-        setattr(session.user_profile, profile_field, answer_value)
+        
+        print(f"DEBUG: update_user_profile_directly - question_id={question_id}, profile_field={profile_field}, answer_value='{answer_value}' (type: {type(answer_value)})")
+        
+        # Handle list fields that need conversion from string to list
+        if profile_field in ["high_risk_activities", "desired_add_ons", "special_coverage_needs"]:
+            print(f"DEBUG: Processing list field {profile_field}")
+            if isinstance(answer_value, str):
+                if answer_value.lower() in ["none", "no", ""]:
+                    processed_value = []
+                else:
+                    processed_value = [answer_value]  # Convert single string to list
+                print(f"DEBUG: Converted {profile_field} from '{answer_value}' (str) to {processed_value} (list)")
+            elif isinstance(answer_value, list):
+                processed_value = answer_value
+                print(f"DEBUG: {profile_field} already a list: {processed_value}")
+            else:
+                processed_value = []
+                print(f"DEBUG: {profile_field} defaulted to empty list")
+            setattr(session.user_profile, profile_field, processed_value)
+            print(f"DEBUG: After setattr, {profile_field} = {getattr(session.user_profile, profile_field)}")
+        else:
+            setattr(session.user_profile, profile_field, answer_value)
+            print(f"DEBUG: Set {profile_field} = {answer_value}")
 
 def parse_basic_info_direct(basic_info: str) -> tuple[int, float]:
     """Parse age and income from basic_info text"""
@@ -1002,6 +1726,9 @@ async def process_completed_questionnaire_agentic(session: QuestionnaireSession)
     user_profile = session.user_profile
     
     print(f"Processing with populated profile: {user_profile.dict()}")
+    
+    # Add debug logging for the entire agentic flow
+    print(f"DEBUG: existing_coverage_type = {user_profile.existing_coverage_type}")
     
     # 1. AGENT: Analyze existing policy if user has coverage
     existing_policy_analysis = None
@@ -1045,6 +1772,9 @@ async def process_completed_questionnaire_agentic(session: QuestionnaireSession)
         print(f"Needs evaluation failed: {e}")
         needs_analysis = create_fallback_needs_analysis(user_profile)
     
+    print(f"DEBUG: needs_analysis.should_get_quotes = {needs_analysis.should_get_quotes}")
+    print(f"DEBUG: needs_analysis.reasoning = {needs_analysis.reasoning}")
+    
     result = {
         "user_profile": user_profile.dict(),
         "existing_policy_analysis": existing_policy_analysis.dict() if existing_policy_analysis else None,
@@ -1071,7 +1801,7 @@ async def process_completed_questionnaire_agentic(session: QuestionnaireSession)
             # Create insurance request
             insurance_request = InsuranceRequest(
                 product_type=product_type,
-                applicant=applicant_data,
+                applicant=applicant_data.model_dump() if hasattr(applicant_data, 'model_dump') else applicant_data,
                 coverage_amount=coverage_amount,
                 deductible=None,
                 term_years=None,
@@ -1080,16 +1810,124 @@ async def process_completed_questionnaire_agentic(session: QuestionnaireSession)
             )
             
             # Get quotes
+            print(f"DEBUG: Fetching quotes with request: {insurance_request}")
             quotes_data = await fetch_insurance_quotes_simple(insurance_request)
+            print(f"DEBUG: Got quotes_data: {quotes_data}")
+            
+            # Convert quotes to insurance cards for frontend display
+            if quotes_data.get("recommended_plans"):
+                print(f"DEBUG: Converting {len(quotes_data['recommended_plans'])} plans to insurance cards")
+                insurance_cards = []
+                for plan in quotes_data["recommended_plans"]:
+                    card = {
+                        "company_name": plan["company_name"],
+                        "plan_name": plan["plan_name"],
+                        "coverage_amount": f"${plan['coverage_amount']:,.0f}",
+                        "monthly_cost": f"${plan['total_monthly_premium']:.2f}/month",
+                        "key_benefits": [
+                            "Critical Illness Coverage",
+                            f"{plan['coverage_details']['product_type'].replace('_', ' ').title()} Protection",
+                            "Instant Approval" if plan['coverage_details'].get('instant_approval') else "Standard Processing"
+                        ],
+                        "company_rating": plan["company_rating"],
+                        "deductible": plan.get("deductible", "None"),
+                        "plan_id": plan["plan_id"]
+                    }
+                    insurance_cards.append(card)
+                
+                result["insurance_cards"] = insurance_cards
+                print(f"DEBUG: Created {len(insurance_cards)} insurance cards")
+            
             result["new_quotes"] = quotes_data
+            
+            # Store the results in session for the recommendations page
+            session.metadata["final_recommendations"] = {
+                "quotes": quotes_data.get("quotes", []),
+                "recommended_plans": quotes_data.get("recommended_plans", []),
+                "insurance_cards": insurance_cards,
+                "user_profile": user_profile.dict(),
+                "needs_analysis": needs_analysis.dict()
+            }
+            await save_session_to_db(session)
             
         except Exception as e:
             print(f"Quote fetching failed: {e}")
             result["quotes_error"] = f"Error fetching quotes: {str(e)}"
     else:
+        print(f"DEBUG: Quotes skipped because should_get_quotes = {needs_analysis.should_get_quotes}")
         result["quotes_skipped"] = needs_analysis.reasoning
     
+    print(f"DEBUG: Final result keys: {result.keys()}")
     return result
+
+@app.get("/recommendations")
+async def serve_recommendations_page():
+    """Serve the insurance recommendations page"""
+    try:
+        with open("frontend/templates/insurance_recommendations.html", "r") as f:
+            html_content = f.read()
+        return HTMLResponse(content=html_content)
+    except FileNotFoundError:
+        raise HTTPException(status_code=500, detail="Recommendations page template not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error serving recommendations page: {str(e)}")
+
+@app.get("/api/recommendations/{session_id}")
+async def get_recommendations(session_id: str):
+    """Get recommendations data for a completed session"""
+    try:
+        session = await get_persistent_session(session_id)
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        if not session.metadata or "final_recommendations" not in session.metadata:
+            raise HTTPException(status_code=404, detail="No recommendations found for this session")
+        
+        recommendations = session.metadata["final_recommendations"]
+        
+        return {
+            "success": True,
+            "recommendations": {
+                "quotes": recommendations.get("quotes", []),
+                "recommended_plans": recommendations.get("recommended_plans", []),
+                "insurance_cards": recommendations.get("insurance_cards", [])
+            },
+            "profile": recommendations.get("user_profile", {}),
+            "needs_analysis": recommendations.get("needs_analysis", {})
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error retrieving recommendations: {str(e)}")
+
+@app.post("/api/purchase-request")
+async def submit_purchase_request(purchase_data: Dict[str, Any]):
+    """Handle insurance purchase requests"""
+    try:
+        # In a real system, this would integrate with the insurance company's purchase API
+        # For now, we'll just log the request and return success
+        
+        purchase_record = {
+            "purchase_id": str(uuid.uuid4()),
+            "plan_id": purchase_data.get("plan_id"),
+            "customer": purchase_data.get("customer", {}),
+            "status": "pending",
+            "request_date": datetime.utcnow(),
+            "notes": "Purchase request submitted via AI Insurance Broker"
+        }
+        
+        # Store in database
+        await async_db["purchase_requests"].insert_one(purchase_record)
+        
+        print(f"DEBUG: Purchase request submitted: {purchase_record}")
+        
+        return {
+            "success": True,
+            "purchase_id": purchase_record["purchase_id"],
+            "message": "Purchase request submitted successfully. An agent will contact you within 24 hours."
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error submitting purchase request: {str(e)}")
 
 def estimate_premium_from_budget(budget_range: str, annual_income: float) -> float:
     """Estimate current premium from budget indication"""
@@ -1139,10 +1977,39 @@ async def fetch_insurance_quotes_simple(insurance_request: InsuranceRequest) -> 
     """Simplified quote fetching"""
     import httpx
     
+    # Convert ApplicantProfile to ApplicantData format expected by backend
+    request_data = insurance_request.model_dump()
+    
+    # Map ApplicantProfile fields to ApplicantData fields
+    if "applicant" in request_data and isinstance(request_data["applicant"], dict):
+        applicant = request_data["applicant"]
+        
+        # Ensure required fields are present with defaults if missing
+        applicant_data = {
+            "first_name": applicant.get("first_name", "Unknown"),
+            "last_name": applicant.get("last_name", "User"),
+            "dob": applicant.get("dob", "1990-01-01"),
+            "gender": applicant.get("gender", "OTHER"),
+            "email": applicant.get("email", "user@example.com"),
+            "phone": applicant.get("phone", "000-000-0000"),
+            "address_line1": applicant.get("address_line1", "123 Main St"),
+            "address_line2": applicant.get("address_line2"),
+            "city": applicant.get("city", "Anytown"),
+            "state": applicant.get("state", "CA"),
+            "postal_code": applicant.get("postal_code", "00000"),
+        }
+        
+        # Copy additional fields that exist in both models
+        for field in ["annual_income", "occupation", "health_status", "smoker_status"]:
+            if field in applicant:
+                applicant_data[field] = applicant[field]
+        
+        request_data["applicant"] = applicant_data
+    
     async with httpx.AsyncClient() as client:
         response = await client.post(
             "http://localhost:8000/v1/quote",
-            json=insurance_request.dict(),
+            json=request_data,
             timeout=30.0
         )
         response.raise_for_status()
@@ -1299,18 +2166,28 @@ def determine_product_type(responses: Dict[str, Any]) -> ProductType:
         else:
             return ProductType.LIFE_TERM
 
-def convert_responses_to_applicant(responses: Dict[str, Any]) -> ApplicantProfile:
+def convert_responses_to_applicant(responses: Dict[str, Any], session: Optional[QuestionnaireSession] = None) -> ApplicantProfile:
     """Convert conversational questionnaire responses to enhanced ApplicantProfile"""
     
-    # Handle both old and new smoking fields for backward compatibility
-    smoking_response = responses.get("smoking_vaping_habits", responses.get("smoking_habits", "never"))
+    # Handle both old and new smoking fields for backward compatibility  
+    # Priority: smoking_vaping_habits > smoking_status > smoking_habits > smoker_status
+    smoking_response = responses.get("smoking_vaping_habits") or responses.get("smoking_status") or responses.get("smoking_habits", "never")
+    
+    # Handle conflicting smoking fields by using the most recent/specific one
+    if responses.get("smoking_status") and responses.get("smoker_status"):
+        print(f"DEBUG: Conflicting smoking fields - smoking_status: {responses.get('smoking_status')}, smoker_status: {responses.get('smoker_status')}")
+        # Use smoking_status as it's more specific than smoker_status
+        smoking_response = responses.get("smoking_status")
+    
     smoker = None
-    if smoking_response in ["regular", "heavy"]:
+    if smoking_response in ["regular", "daily", "occasional"]:  # Include occasional as smoker
         smoker = True
     elif smoking_response in ["never", "quit_over_year"]:
         smoker = False
-    elif smoking_response in ["quit_under_year", "occasional", "social"]:
-        smoker = True  # Recent quitters and occasional users still rated as smokers
+    elif smoking_response in ["quit_under_year"]:
+        smoker = True  # Recent quitters still rated as smokers
+    
+    print(f"DEBUG: Final smoking determination - response: {smoking_response}, smoker: {smoker}")
     
     # Translate health conditions from conversational to medical terms
     health_response = responses.get("health_conditions", "none")
@@ -1378,33 +2255,71 @@ def convert_responses_to_applicant(responses: Dict[str, Any]) -> ApplicantProfil
     else:
         travel_frequency = "domestic"
     
-    # Use actual annual income if provided, otherwise estimate
-    actual_income = responses.get("annual_income")
+    # Get personal fields from session metadata (for JSON/PDF uploads)
+    personal_fields = {}
+    if session and session.metadata and "personal_fields" in session.metadata:
+        personal_fields = session.metadata["personal_fields"]
+        print(f"DEBUG: Using personal fields from session: {personal_fields}")
+    
+    # Use actual annual income if provided (check personal fields first, then responses), otherwise estimate
+    actual_income = personal_fields.get("annual_income") or responses.get("annual_income")
     if actual_income and isinstance(actual_income, (int, float)) and actual_income > 0:
         annual_income = float(actual_income)
     else:
         annual_income = estimated_income
     
-    return ApplicantProfile(
-        # Personal Information
-        first_name=responses.get("personal_first_name", ""),
-        last_name=responses.get("personal_last_name", ""),
-        dob=responses.get("personal_dob", "1990-01-01"),
-        gender=responses.get("personal_gender", "M"),
-        email=responses.get("personal_email", ""),
-        phone=responses.get("personal_phone", ""),
+    print(f"DEBUG: Final annual_income: {annual_income} (actual: {actual_income}, estimated: {estimated_income})")
+    
+    # Fix list fields that may come as strings from UserProfile schema
+    def ensure_list_field(field_value, default_list=None):
+        """Convert string fields to lists for ApplicantProfile compatibility"""
+        if default_list is None:
+            default_list = []
         
-        # Address
-        address_line1=responses.get("address_line1", ""),
+        if field_value is None:
+            return default_list
+        elif isinstance(field_value, list):
+            return field_value
+        elif isinstance(field_value, str):
+            if field_value.lower() in ["none", "no", ""]:
+                return []
+            else:
+                return [field_value]  # Convert single string to list
+        else:
+            return default_list
+    
+    # Process list fields with proper conversion
+    high_risk_activities_raw = responses.get("high_risk_activities", ["none"])
+    high_risk_activities_list = ensure_list_field(high_risk_activities_raw, ["none"])
+    
+    desired_add_ons_raw = responses.get("desired_add_ons", [])
+    desired_add_ons_list = ensure_list_field(desired_add_ons_raw, [])
+    
+    special_coverage_needs_raw = responses.get("special_coverage_needs", [])
+    special_coverage_needs_list = ensure_list_field(special_coverage_needs_raw, [])
+    
+    print(f"DEBUG: Converted list fields - high_risk_activities: {high_risk_activities_list}, desired_add_ons: {desired_add_ons_list}")
+    
+    return ApplicantProfile(
+        # Personal Information - use session metadata first, then responses
+        first_name=personal_fields.get("personal_first_name") or responses.get("personal_first_name", "User"),
+        last_name=personal_fields.get("personal_last_name") or responses.get("personal_last_name", "Person"),
+        dob=personal_fields.get("personal_dob") or responses.get("personal_dob", "1990-01-01"),
+        gender=personal_fields.get("personal_gender") or responses.get("personal_gender", "M"),
+        email=personal_fields.get("personal_email") or responses.get("personal_email", "user@example.com"),
+        phone=personal_fields.get("personal_phone") or responses.get("personal_phone", "000-000-0000"),
+        
+        # Address - use session metadata first, then responses
+        address_line1=personal_fields.get("address_line1") or responses.get("address_line1", "123 Main St"),
         address_line2=None,
-        city=responses.get("address_city", ""),
-        state=responses.get("address_state", "CA"),
-        postal_code=responses.get("address_postal_code", ""),
+        city=personal_fields.get("address_city") or responses.get("address_city", "Anytown"),
+        state=personal_fields.get("address_state") or responses.get("address_state", "CA"),
+        postal_code=personal_fields.get("address_postal_code") or responses.get("address_postal_code", "12345"),
         country="US",
         
         # Financial Information
         annual_income=annual_income,
-        occupation=occupation,
+        occupation=responses.get("occupation", occupation),  # Use actual occupation from enhanced questionnaire, fallback to estimated
         
         # Health Information (enhanced)
         smoker=smoker,
@@ -1418,11 +2333,11 @@ def convert_responses_to_applicant(responses: Dict[str, Any]) -> ApplicantProfil
         hospitalizations_last_5_years=0 if health_overall in ["excellent", "good"] else 1,
         family_medical_history=[],  # Not asked in conversational format
         
-        # Lifestyle Risk Factors (Phase 1)
+        # Lifestyle Risk Factors (Phase 1) - Map from enhanced questionnaire
         alcohol_consumption=responses.get("alcohol_consumption", "social"),
-        exercise_frequency=responses.get("exercise_habits", "weekly" if health_overall in ["excellent", "good"] else "monthly"),
+        exercise_frequency=responses.get("exercise_frequency", "weekly" if health_overall in ["excellent", "good"] else "monthly"),
         dietary_habits=responses.get("dietary_habits"),
-        high_risk_activities=responses.get("high_risk_activities", []),
+        high_risk_activities=high_risk_activities_list,
         travel_frequency=travel_frequency,
         
         # Coverage Gaps & Transition Status (Phase 2)
@@ -1430,11 +2345,11 @@ def convert_responses_to_applicant(responses: Dict[str, Any]) -> ApplicantProfil
         parents_policy_end_date=responses.get("parents_policy_end_date"),
         employer_coverage_expectation=responses.get("employer_coverage_expectation"),
         hospital_preference=responses.get("hospital_preference"),
-        special_coverage_needs=responses.get("special_coverage_needs", []),
+        special_coverage_needs=special_coverage_needs_list,
         
         # Preferences & Budget (Phase 3)
         coverage_vs_premium_priority=responses.get("coverage_vs_premium_priority"),
-        desired_add_ons=responses.get("desired_add_ons", []),
+        desired_add_ons=desired_add_ons_list,
         monthly_premium_budget=responses.get("monthly_premium_budget"),
         deductible_copay_preference=responses.get("deductible_copay_preference")
     )
@@ -1467,7 +2382,7 @@ async def upload_policy_document(
         if file_ext == '.pdf':
             try:
                 pdf_parser = get_pdf_parser()
-                extraction_result = await pdf_parser.extract_pdf_fields(file_content, policy_file.filename)
+                extraction_result = await pdf_parser.extract_insurance_fields_async(file_content)
             except Exception as e:
                 print(f"PDF parsing failed: {e}")
                 # Continue with fallback analysis
@@ -1492,11 +2407,11 @@ async def upload_policy_document(
             print(f"Policy analysis failed: {e}")
             # Create fallback analysis
             analysis = ExistingPolicyAssessment(
-                coverage_adequacy="unknown",
+                coverage_adequacy="adequately_insured",
                 monthly_cost_assessment="reasonable",
                 coverage_gaps=["Unable to fully analyze document"],
                 over_coverage_areas=[],
-                primary_action="get_new_coverage" if extracted_data else "continue_current",
+                primary_action="get_new_coverage" if extracted_data else "no_action",
                 potential_monthly_savings=0.0,
                 confidence_score=30,
                 analysis_reasoning="Document processed but detailed analysis unavailable. Consider getting quotes to compare your options.",
@@ -1533,6 +2448,207 @@ async def upload_policy_document(
             status_code=500, 
             detail=f"Failed to process policy document: {str(e)}"
         )
+
+# ============================================
+# MINIMAL DEMO AUTHENTICATION ENDPOINTS
+# ============================================
+
+@app.post("/api/auth/register", response_model=AuthResponse)
+async def register_user(request: RegisterRequest):
+    """Register a new user (demo-level auth)"""
+    try:
+        # Check if user already exists
+        existing_user = await async_db[Collections.USERS].find_one({"email": request.email})
+        if existing_user:
+            return AuthResponse(
+                success=False,
+                message="Email already registered"
+            )
+        
+        # Create new user
+        user_id = f"USER_{uuid.uuid4().hex[:8].upper()}"
+        user_doc = {
+            "user_id": user_id,
+            "email": request.email,
+            "full_name": request.full_name,
+            "password": request.password,  # DEMO: Plain text (never do this in production!)
+            "profile_data": {},
+            "is_active": True,
+            "last_login": None,
+            "customer_id": None,
+            "purchased_policies": [],
+            "created_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow()
+        }
+        
+        await async_db[Collections.USERS].insert_one(user_doc)
+        
+        return AuthResponse(
+            success=True,
+            user_id=user_id,
+            message="Registration successful",
+            user_data={
+                "user_id": user_id,
+                "email": request.email,
+                "full_name": request.full_name
+            }
+        )
+        
+    except Exception as e:
+        print(f"❌ Registration error: {e}")
+        return AuthResponse(
+            success=False,
+            message="Registration failed. Please try again."
+        )
+
+@app.post("/api/auth/login", response_model=AuthResponse)
+async def login_user(request: LoginRequest):
+    """Login user (demo-level auth)"""
+    try:
+        # Find user
+        user_doc = await async_db[Collections.USERS].find_one({"email": request.email})
+        
+        if not user_doc:
+            return AuthResponse(
+                success=False,
+                message="Invalid email or password"
+            )
+        
+        # Verify password (demo: plain text comparison)
+        if user_doc["password"] != request.password:
+            return AuthResponse(
+                success=False,
+                message="Invalid email or password"
+            )
+        
+        # Update last login
+        await async_db[Collections.USERS].update_one(
+            {"user_id": user_doc["user_id"]},
+            {"$set": {"last_login": datetime.utcnow()}}
+        )
+        
+        return AuthResponse(
+            success=True,
+            user_id=user_doc["user_id"],
+            message="Login successful",
+            user_data={
+                "user_id": user_doc["user_id"],
+                "email": user_doc["email"],
+                "full_name": user_doc["full_name"],
+                "profile_data": user_doc.get("profile_data", {}),
+                "purchased_policies": user_doc.get("purchased_policies", [])
+            }
+        )
+        
+    except Exception as e:
+        print(f"❌ Login error: {e}")
+        return AuthResponse(
+            success=False,
+            message="Login failed. Please try again."
+        )
+
+@app.get("/api/user/{user_id}/policies")
+async def get_user_policies_proxy(user_id: str):
+    """Proxy endpoint to get user policies from backend"""
+    try:
+        import httpx
+        async with httpx.AsyncClient() as client:
+            response = await client.get(f"http://localhost:8000/v1/user/{user_id}/policies")
+            return response.json()
+    except Exception as e:
+        print(f"❌ Failed to fetch user policies: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch user policies")
+
+@app.post("/api/claims/file")
+async def file_claim_proxy(claim_data: Dict[str, Any]):
+    """Proxy endpoint to file claims via backend"""
+    try:
+        import httpx
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "http://localhost:8000/v1/claims/file",
+                json=claim_data
+            )
+            return response.json()
+    except Exception as e:
+        print(f"❌ Failed to file claim: {e}")
+        raise HTTPException(status_code=500, detail="Failed to file claim")
+
+@app.get("/api/user/{user_id}/claims")
+async def get_user_claims_proxy(user_id: str):
+    """Proxy endpoint to get user claims from backend"""
+    try:
+        import httpx
+        async with httpx.AsyncClient() as client:
+            response = await client.get(f"http://localhost:8000/v1/user/{user_id}/claims")
+            return response.json()
+    except Exception as e:
+        print(f"❌ Failed to fetch user claims: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch user claims")
+
+@app.post("/api/policies/purchase")
+async def purchase_policy_proxy(purchase_data: Dict[str, Any]):
+    """Proxy endpoint to purchase policies via backend"""
+    try:
+        import httpx
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "http://localhost:8000/v1/policy/purchase",
+                json=purchase_data
+            )
+            return response.json()
+    except Exception as e:
+        print(f"❌ Failed to purchase policy: {e}")
+        raise HTTPException(status_code=500, detail="Failed to purchase policy")
+
+@app.get("/api/auth/user/{user_id}")
+async def get_user_profile(user_id: str):
+    """Get user profile data"""
+    try:
+        user_doc = await async_db[Collections.USERS].find_one({"user_id": user_id})
+        
+        if not user_doc:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        return {
+            "user_id": user_doc["user_id"],
+            "email": user_doc["email"], 
+            "full_name": user_doc["full_name"],
+            "profile_data": user_doc.get("profile_data", {}),
+            "purchased_policies": user_doc.get("purchased_policies", []),
+            "last_login": user_doc.get("last_login")
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Get user profile error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get user profile")
+
+@app.put("/api/auth/user/{user_id}/profile")
+async def update_user_profile(user_id: str, profile_data: Dict[str, Any]):
+    """Update user profile data"""
+    try:
+        result = await async_db[Collections.USERS].update_one(
+            {"user_id": user_id},
+            {
+                "$set": {
+                    "profile_data": profile_data,
+                    "updated_at": datetime.utcnow()
+                }
+            }
+        )
+        
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        return {"success": True, "message": "Profile updated successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Update profile error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update profile")
 
 
 if __name__ == "__main__":

@@ -9,7 +9,7 @@ from typing import Dict, Any, List, Optional
 from pydantic import BaseModel
 from enum import Enum
 
-from shared.models import ApplicantProfile
+from backend.shared.models import ApplicantProfile
 
 # Import the actual QuotePlan model from the backend
 import sys
@@ -17,7 +17,7 @@ import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 try:
-    from backend.insurance_backend_mongo import QuotePlan
+    from insurance_backend.insurance_backend_mongo import QuotePlan
 except ImportError:
     # Fallback definition if import fails
     from pydantic import BaseModel

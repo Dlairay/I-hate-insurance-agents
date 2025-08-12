@@ -37,124 +37,145 @@ def clear_database():
 
 
 def create_insurance_companies() -> List[Dict[str, Any]]:
-    """Create fake insurance companies"""
-    print("Creating insurance companies...")
+    """Create 25 diverse insurance companies (5x expansion)"""
+    print("Creating 25 insurance companies...")
     
-    companies = [
-        {
-            "company_id": "HEALTHGUARD",
-            "name": "HealthGuard Insurance Co.",
+    # Company name templates
+    health_names = ["HealthGuard", "MedShield", "VitalCare", "WellnessFirst", "SecureHealth", "PrimeHealth", "LifeWell"]
+    life_names = ["LifeCare", "TrustLife", "EternalCare", "FamilyFirst", "LifeGuard", "SecureLife", "PermanentCare"]  
+    multi_names = ["ShieldPro", "AmeriCare", "UnitedCover", "NationalSure", "CompleteCare", "TotalGuard", "AllCover"]
+    specialty_names = ["CriticalCare", "DisabilityPlus", "AccidentShield", "SupplementalPro", "BenefitMax"]
+    
+    all_states = ["CA", "NY", "TX", "FL", "IL", "PA", "OH", "GA", "NC", "MI", "WA", "MA", "VA", "AZ", "CO", "NJ", "MD", "CT", "OR", "SC"]
+    
+    companies = []
+    
+    # Health Insurance Companies (8 companies)
+    for i, name in enumerate(health_names + ["GlobalHealth"]):
+        company = {
+            "company_id": f"HEALTH{i+1:02d}",
+            "name": f"{name} Insurance Co.",
             "type": "health",
-            "rating": 4.5,
-            "established_year": 1985,
-            "states_available": ["CA", "NY", "TX", "FL", "IL", "PA", "OH", "GA", "NC", "MI"],
-            "products_offered": ["HEALTH_BASIC", "HEALTH_PREMIUM", "CRITICAL_ILLNESS"],
-            "api_endpoint": "https://api.healthguard.com/v1",
-            "api_key": "HG_" + uuid.uuid4().hex[:16],
-            "risk_appetite": "moderate",
+            "rating": round(random.uniform(3.8, 4.9), 1),
+            "established_year": random.randint(1950, 2015),
+            "states_available": random.sample(all_states, random.randint(8, 15)),
+            "products_offered": ["HEALTH_BASIC", "HEALTH_PREMIUM"] + (["CRITICAL_ILLNESS"] if random.random() > 0.3 else []),
+            "api_endpoint": f"https://api.{name.lower()}.com/v1",
+            "api_key": f"H{i+1}_" + uuid.uuid4().hex[:16],
+            "risk_appetite": random.choice(["conservative", "moderate", "aggressive"]),
             "max_coverage_limits": {
-                "HEALTH_BASIC": 1000000,
-                "HEALTH_PREMIUM": 5000000,
-                "CRITICAL_ILLNESS": 500000
+                "HEALTH_BASIC": random.randint(500000, 2000000),
+                "HEALTH_PREMIUM": random.randint(2000000, 10000000),
+                "CRITICAL_ILLNESS": random.randint(250000, 1500000)
             },
-            "underwriting_turnaround_days": 2,
-            "contact_email": "quotes@healthguard.com",
-            "contact_phone": "1-800-HEALTH1",
-            "website": "www.healthguard.com"
-        },
-        {
-            "company_id": "LIFECARE",
-            "name": "LifeCare Mutual",
-            "type": "life",
-            "rating": 4.7,
-            "established_year": 1920,
-            "states_available": ["CA", "NY", "TX", "FL", "IL", "WA", "MA", "VA", "AZ", "CO"],
-            "products_offered": ["LIFE_TERM", "LIFE_WHOLE", "CRITICAL_ILLNESS"],
-            "api_endpoint": "https://api.lifecare.com/v1",
-            "api_key": "LC_" + uuid.uuid4().hex[:16],
-            "risk_appetite": "conservative",
+            "underwriting_turnaround_days": random.randint(1, 7),
+            "contact_email": f"quotes@{name.lower()}.com",
+            "contact_phone": f"1-800-{name[:6].upper()}{random.randint(10, 99)}",
+            "website": f"www.{name.lower()}.com",
+            "market_share": round(random.uniform(0.5, 15.0), 1),
+            "claims_processing_days": random.randint(3, 21),
+            "customer_satisfaction": round(random.uniform(3.5, 4.8), 1)
+        }
+        companies.append(company)
+    
+    # Life Insurance Companies (8 companies) 
+    for i, name in enumerate(life_names + ["InfiniteLife"]):
+        company = {
+            "company_id": f"LIFE{i+1:02d}",
+            "name": f"{name} Insurance",
+            "type": "life", 
+            "rating": round(random.uniform(4.0, 4.9), 1),
+            "established_year": random.randint(1900, 2010),
+            "states_available": random.sample(all_states, random.randint(10, 18)),
+            "products_offered": ["LIFE_TERM"] + (["LIFE_WHOLE"] if random.random() > 0.2 else []) + (["CRITICAL_ILLNESS"] if random.random() > 0.4 else []),
+            "api_endpoint": f"https://api.{name.lower()}.com/v1", 
+            "api_key": f"L{i+1}_" + uuid.uuid4().hex[:16],
+            "risk_appetite": random.choice(["conservative", "moderate", "aggressive"]),
             "max_coverage_limits": {
-                "LIFE_TERM": 10000000,
-                "LIFE_WHOLE": 5000000,
-                "CRITICAL_ILLNESS": 1000000
+                "LIFE_TERM": random.randint(3000000, 25000000),
+                "LIFE_WHOLE": random.randint(1000000, 15000000),
+                "CRITICAL_ILLNESS": random.randint(500000, 3000000)
             },
-            "underwriting_turnaround_days": 5,
-            "contact_email": "newbusiness@lifecare.com",
-            "contact_phone": "1-800-LIFE123",
-            "website": "www.lifecare.com"
-        },
-        {
-            "company_id": "SHIELDPRO",
-            "name": "ShieldPro Insurance Group",
+            "underwriting_turnaround_days": random.randint(3, 14),
+            "contact_email": f"newbusiness@{name.lower()}.com",
+            "contact_phone": f"1-877-{name[:4].upper()}{random.randint(100, 999)}",
+            "website": f"www.{name.lower()}.com",
+            "market_share": round(random.uniform(0.8, 20.0), 1),
+            "claims_processing_days": random.randint(5, 30),
+            "customer_satisfaction": round(random.uniform(3.8, 4.9), 1)
+        }
+        companies.append(company)
+    
+    # Multi-Line Insurance Companies (7 companies)
+    for i, name in enumerate(multi_names):
+        products = ["HEALTH_BASIC", "HEALTH_PREMIUM", "LIFE_TERM"]
+        if random.random() > 0.3:
+            products.append("LIFE_WHOLE")
+        if random.random() > 0.2:  
+            products.append("CRITICAL_ILLNESS")
+            
+        company = {
+            "company_id": f"MULTI{i+1:02d}",
+            "name": f"{name} Insurance Group",
             "type": "multi-line",
-            "rating": 4.3,
-            "established_year": 1998,
-            "states_available": ["CA", "TX", "FL", "NY", "PA", "IL", "OH", "GA", "NC", "MI"],
-            "products_offered": ["HEALTH_BASIC", "HEALTH_PREMIUM", "LIFE_TERM", "CRITICAL_ILLNESS"],
-            "api_endpoint": "https://api.shieldpro.com/v1",
-            "api_key": "SP_" + uuid.uuid4().hex[:16],
+            "rating": round(random.uniform(4.1, 4.8), 1),
+            "established_year": random.randint(1960, 2005),
+            "states_available": random.sample(all_states, random.randint(12, 20)),
+            "products_offered": products,
+            "api_endpoint": f"https://api.{name.lower()}.com/v1",
+            "api_key": f"M{i+1}_" + uuid.uuid4().hex[:16],
+            "risk_appetite": random.choice(["moderate", "aggressive"]),
+            "max_coverage_limits": {
+                "HEALTH_BASIC": random.randint(750000, 2500000),
+                "HEALTH_PREMIUM": random.randint(2500000, 8000000),
+                "LIFE_TERM": random.randint(2000000, 20000000),
+                "LIFE_WHOLE": random.randint(1000000, 12000000),
+                "CRITICAL_ILLNESS": random.randint(400000, 2000000)
+            },
+            "underwriting_turnaround_days": random.randint(1, 10),
+            "contact_email": f"quotes@{name.lower()}.com",
+            "contact_phone": f"1-888-{name[:6].upper()}{random.randint(10, 99)}",
+            "website": f"www.{name.lower()}.com",
+            "market_share": round(random.uniform(2.0, 25.0), 1),
+            "claims_processing_days": random.randint(2, 18),
+            "customer_satisfaction": round(random.uniform(3.7, 4.7), 1)
+        }
+        companies.append(company)
+    
+    # Specialty Insurance Companies (2 companies)
+    for i, name in enumerate(specialty_names[:2]):
+        company = {
+            "company_id": f"SPEC{i+1:02d}",
+            "name": f"{name} Specialists",
+            "type": "specialty",
+            "rating": round(random.uniform(4.2, 4.7), 1),
+            "established_year": random.randint(1980, 2020),
+            "states_available": random.sample(all_states, random.randint(6, 12)),
+            "products_offered": ["CRITICAL_ILLNESS"] + (["HEALTH_BASIC"] if random.random() > 0.5 else []),
+            "api_endpoint": f"https://api.{name.lower()}.com/v1",
+            "api_key": f"S{i+1}_" + uuid.uuid4().hex[:16],
             "risk_appetite": "aggressive",
             "max_coverage_limits": {
-                "HEALTH_BASIC": 750000,
-                "HEALTH_PREMIUM": 3000000,
-                "LIFE_TERM": 5000000,
-                "CRITICAL_ILLNESS": 750000
+                "CRITICAL_ILLNESS": random.randint(1000000, 5000000),
+                "HEALTH_BASIC": random.randint(800000, 3000000)
             },
-            "underwriting_turnaround_days": 1,
-            "contact_email": "quick-quote@shieldpro.com",
-            "contact_phone": "1-888-SHIELD1",
-            "website": "www.shieldpro.com"
-        },
-        {
-            "company_id": "AMERICARE",
-            "name": "AmeriCare National",
-            "type": "health",
-            "rating": 4.6,
-            "established_year": 1975,
-            "states_available": ["NY", "CA", "TX", "FL", "PA", "NJ", "MA", "CT", "MD", "VA"],
-            "products_offered": ["HEALTH_BASIC", "HEALTH_PREMIUM", "CRITICAL_ILLNESS"],
-            "api_endpoint": "https://api.americare.com/v1",
-            "api_key": "AC_" + uuid.uuid4().hex[:16],
-            "risk_appetite": "moderate",
-            "max_coverage_limits": {
-                "HEALTH_BASIC": 1500000,
-                "HEALTH_PREMIUM": 7500000,
-                "CRITICAL_ILLNESS": 1000000
-            },
-            "underwriting_turnaround_days": 3,
-            "contact_email": "brokers@americare.com",
-            "contact_phone": "1-800-AMCARE1",
-            "website": "www.americare.com"
-        },
-        {
-            "company_id": "TRUSTLIFE",
-            "name": "TrustLife Insurance",
-            "type": "life",
-            "rating": 4.8,
-            "established_year": 1910,
-            "states_available": ["CA", "NY", "TX", "FL", "IL", "PA", "OH", "GA", "NC", "MI"],
-            "products_offered": ["LIFE_TERM", "LIFE_WHOLE", "CRITICAL_ILLNESS"],
-            "api_endpoint": "https://api.trustlife.com/v1",
-            "api_key": "TL_" + uuid.uuid4().hex[:16],
-            "risk_appetite": "conservative",
-            "max_coverage_limits": {
-                "LIFE_TERM": 15000000,
-                "LIFE_WHOLE": 10000000,
-                "CRITICAL_ILLNESS": 2000000
-            },
-            "underwriting_turnaround_days": 7,
-            "contact_email": "newpolicies@trustlife.com",
-            "contact_phone": "1-877-TRUST11",
-            "website": "www.trustlife.com"
+            "underwriting_turnaround_days": random.randint(1, 5),
+            "contact_email": f"specialist@{name.lower()}.com",
+            "contact_phone": f"1-855-{name[:4].upper()}{random.randint(100, 999)}",
+            "website": f"www.{name.lower()}.com",
+            "market_share": round(random.uniform(0.2, 3.0), 1),
+            "claims_processing_days": random.randint(1, 10),
+            "customer_satisfaction": round(random.uniform(4.0, 4.8), 1)
         }
-    ]
+        companies.append(company)
     
+    # Add timestamps
     for company in companies:
         company["created_at"] = datetime.now(timezone.utc)
-        company["updated_at"] = datetime.now(timezone.utc)
     
+    # Insert companies into database
     result = sync_db[Collections.COMPANIES].insert_many(companies)
-    print(f"Created {len(result.inserted_ids)} insurance companies")
+    print(f"✅ Created {len(result.inserted_ids)} insurance companies")
     return companies
 
 
@@ -167,12 +188,12 @@ def create_insurance_products(companies: List[Dict[str, Any]]) -> List[Dict[str,
         "HEALTH_BASIC": {
             "name_suffix": "Essential Health",
             "description": "Basic health coverage for individuals and families",
-            "min_coverage": 100000,
+            "min_coverage": 25000,  # Lowered from 100000 to be more inclusive
             "max_coverage": 1000000,
             "coverage_types": ["hospitalization", "emergency", "preventive_care", "prescription_basic"],
             "min_age": 18,
-            "max_age": 65,
-            "base_rate": 200,
+            "max_age": 70,  # Increased age range
+            "base_rate": 150,  # Reduced base rate
             "available_riders": [
                 {"code": "DENTAL", "name": "Basic Dental", "rate": 25},
                 {"code": "VISION", "name": "Vision Care", "rate": 15}
@@ -183,12 +204,12 @@ def create_insurance_products(companies: List[Dict[str, Any]]) -> List[Dict[str,
         "HEALTH_PREMIUM": {
             "name_suffix": "Premier Health",
             "description": "Comprehensive health coverage with enhanced benefits",
-            "min_coverage": 500000,
+            "min_coverage": 50000,  # Lowered from 500000 to cover more scenarios
             "max_coverage": 5000000,
             "coverage_types": ["hospitalization", "emergency", "preventive_care", "prescription_full", "specialist", "mental_health"],
             "min_age": 18,
-            "max_age": 70,
-            "base_rate": 500,
+            "max_age": 75,  # Increased age range
+            "base_rate": 300,  # Reduced base rate
             "available_riders": [
                 {"code": "DENTAL_PLUS", "name": "Premium Dental", "rate": 50},
                 {"code": "VISION_PLUS", "name": "Premium Vision", "rate": 30},
@@ -260,35 +281,47 @@ def create_insurance_products(companies: List[Dict[str, Any]]) -> List[Dict[str,
                     "aggressive": 0.85
                 }[company["risk_appetite"]]
                 
-                product = {
-                    "product_id": f"{company['company_id']}_{product_type}",
-                    "company_id": company["company_id"],
-                    "product_type": product_type,
-                    "product_name": f"{company['name']} {template['name_suffix']}",
-                    "description": template["description"],
-                    "min_coverage": template["min_coverage"],
-                    "max_coverage": min(template["max_coverage"], company["max_coverage_limits"].get(product_type, template["max_coverage"])),
-                    "coverage_types": template["coverage_types"],
-                    "min_age": template["min_age"],
-                    "max_age": template["max_age"],
-                    "states_available": company["states_available"],
-                    "available_riders": template["available_riders"],
-                    "waiting_periods": template["waiting_periods"],
-                    "exclusions": template["exclusions"],
-                    "base_rate": template["base_rate"] * rate_multiplier,
-                    "rating_factors": {
-                        "age_per_year": 0.02,
-                        "smoker": 1.5,
-                        "bmi_over_30": 1.2,
-                        "bmi_over_35": 1.4,
-                        "pre_existing": 1.8,
-                        "family_history": 1.1
-                    },
-                    "active": True,
-                    "created_at": datetime.now(timezone.utc),
-                    "updated_at": datetime.now(timezone.utc)
-                }
-                products.append(product)
+                # Create 2-3 variations per product type for more options
+                tiers = ["Standard", "Plus", "Elite"] if product_type in ["HEALTH_PREMIUM", "LIFE_TERM"] else ["Standard", "Plus"]
+                
+                for i, tier in enumerate(tiers):
+                    tier_multiplier = [1.0, 1.3, 1.6][i]  # Price increases with tier
+                    coverage_multiplier = [0.5, 1.0, 1.5][i]  # Standard tier has LOWER min coverage for accessibility
+                    
+                    # Skip Elite tier for some companies to create variety
+                    if tier == "Elite" and random.random() < 0.4:
+                        continue
+                        
+                    product = {
+                        "product_id": f"{company['company_id']}_{product_type}_{tier.upper()}",
+                        "company_id": company["company_id"],
+                        "product_type": product_type,
+                        "product_name": f"{company['name']} {template['name_suffix']} {tier}",
+                        "description": f"{template['description']} - {tier} tier with {'enhanced' if i > 0 else 'standard'} benefits",
+                        "min_coverage": max(10000, int(template["min_coverage"] * coverage_multiplier)),  # Ensure minimum is at least $10k
+                        "max_coverage": int(min(template["max_coverage"] * coverage_multiplier, company["max_coverage_limits"].get(product_type, template["max_coverage"]))),
+                        "coverage_types": template["coverage_types"] + (["telemedicine", "wellness_programs"] if i > 0 else []),
+                        "min_age": template["min_age"],
+                        "max_age": template["max_age"] + (5 if i > 1 else 0),  # Elite products may accept older ages
+                        "states_available": company["states_available"],
+                        "available_riders": template["available_riders"] + ([{"code": "PREMIUM_WAIVER", "name": "Premium Waiver", "rate": template["base_rate"] * 0.1}] if i > 0 else []),
+                        "waiting_periods": {k: max(1, int(v / (i + 1))) for k, v in template["waiting_periods"].items()},  # Better tiers have shorter waiting
+                        "exclusions": template["exclusions"] if i == 0 else template["exclusions"][:-1],  # Fewer exclusions for higher tiers
+                        "base_rate": template["base_rate"] * rate_multiplier * tier_multiplier,
+                        "tier": tier,
+                        "rating_factors": {
+                            "age_per_year": 0.02 - (0.005 * i),  # Better rates for premium tiers
+                            "smoker": 1.5 - (0.1 * i),
+                            "bmi_over_30": 1.2 - (0.05 * i),
+                            "bmi_over_35": 1.4 - (0.1 * i),
+                            "pre_existing": 1.8 - (0.2 * i),
+                            "family_history": 1.1 - (0.02 * i)
+                        },
+                        "active": True,
+                        "created_at": datetime.now(timezone.utc),
+                        "updated_at": datetime.now(timezone.utc)
+                    }
+                    products.append(product)
     
     if products:
         result = sync_db[Collections.PRODUCTS].insert_many(products)
@@ -306,9 +339,22 @@ def create_customers(num_customers: int = 100) -> List[Dict[str, Any]]:
         "anxiety", "thyroid", "migraine", "allergies", "none"
     ]
     
+    # Enhanced occupations matching questionnaire options
     occupations = [
+        "office_professional", "healthcare", "education", "retail_service",
+        "transportation", "construction", "law_enforcement", "self_employed",
         "teacher", "engineer", "nurse", "accountant", "sales", "manager",
         "developer", "designer", "doctor", "lawyer", "contractor", "retail"
+    ]
+    
+    # Enhanced lifestyle factors for v2.0 questionnaire
+    smoking_habits = ["never", "quit_over_year", "quit_under_year", "occasional", "regular", "daily"]
+    alcohol_consumption_levels = ["never", "rare", "social", "moderate", "daily"]
+    exercise_frequencies = ["daily", "regular", "weekly", "monthly", "rarely"]
+    high_risk_activity_options = [
+        ["none"], ["scuba"], ["skydiving"], ["racing"], ["climbing"], 
+        ["martial_arts"], ["flying"], ["extreme_sports"],
+        ["scuba", "climbing"], ["racing", "martial_arts"], ["none"]
     ]
     
     for i in range(num_customers):
@@ -327,7 +373,20 @@ def create_customers(num_customers: int = 100) -> List[Dict[str, Any]]:
         weight_kg = base_weight + age_factor + random.uniform(-10, 10)
         bmi = weight_kg / ((height_cm / 100) ** 2)
         
-        # Risk scoring
+        # Enhanced lifestyle factors
+        smoking_habit = random.choice(smoking_habits)
+        # Weight smoking habits toward healthier options
+        if age < 30:
+            smoking_habit = random.choices(smoking_habits, weights=[50, 20, 10, 10, 5, 5])[0]
+        elif age > 50:
+            smoking_habit = random.choices(smoking_habits, weights=[30, 30, 15, 15, 5, 5])[0]
+        
+        smoker = smoking_habit in ["regular", "daily"]
+        alcohol_level = random.choice(alcohol_consumption_levels)
+        exercise_freq = random.choice(exercise_frequencies)
+        risk_activities = random.choice(high_risk_activity_options)
+        
+        # Risk scoring with enhanced factors
         risk_score = 30  # Base
         risk_factors = []
         
@@ -338,10 +397,37 @@ def create_customers(num_customers: int = 100) -> List[Dict[str, Any]]:
             risk_score += 10
             risk_factors.append("Age 45-60")
         
-        smoker = random.random() < 0.2  # 20% smokers
-        if smoker:
-            risk_score += 15
-            risk_factors.append("Smoker")
+        # Enhanced smoking assessment
+        smoking_risk_map = {"daily": 20, "regular": 15, "occasional": 8, "quit_under_year": 10, "quit_over_year": 5, "never": 0}
+        smoke_risk = smoking_risk_map[smoking_habit]
+        if smoke_risk > 0:
+            risk_score += smoke_risk
+            risk_factors.append(f"Smoking: {smoking_habit}")
+        
+        # Alcohol risk
+        alcohol_risk_map = {"daily": 12, "moderate": 6, "social": 2, "rare": 0, "never": -2}
+        alcohol_risk = alcohol_risk_map[alcohol_level]
+        risk_score += alcohol_risk
+        if alcohol_risk > 0:
+            risk_factors.append(f"Alcohol: {alcohol_level}")
+        
+        # Exercise benefit
+        exercise_risk_map = {"daily": -8, "regular": -5, "weekly": -2, "monthly": 0, "rarely": 3}
+        exercise_risk = exercise_risk_map[exercise_freq]
+        risk_score += exercise_risk
+        if exercise_risk < 0:
+            risk_factors.append(f"Regular exercise: {exercise_freq}")
+        elif exercise_risk > 0:
+            risk_factors.append(f"Sedentary: {exercise_freq}")
+        
+        # High-risk activities
+        if "none" not in risk_activities:
+            activity_risk_map = {"scuba": 5, "skydiving": 8, "racing": 10, "climbing": 6, "martial_arts": 4, "flying": 7, "extreme_sports": 10}
+            for activity in risk_activities:
+                activity_risk = activity_risk_map.get(activity, 0)
+                if activity_risk > 0:
+                    risk_score += activity_risk
+                    risk_factors.append(f"High-risk: {activity}")
         
         if bmi > 30:
             risk_score += 10
@@ -373,6 +459,10 @@ def create_customers(num_customers: int = 100) -> List[Dict[str, Any]]:
                 "weight_kg": round(weight_kg, 1),
                 "bmi": round(bmi, 1),
                 "smoker": smoker,
+                "smoking_vaping_habits": smoking_habit,
+                "alcohol_consumption": alcohol_level,
+                "exercise_frequency": exercise_freq,
+                "high_risk_activities": risk_activities,
                 "pre_existing_conditions": conditions,
                 "medications": [] if conditions[0] == "none" else random.sample(["metformin", "lisinopril", "atorvastatin", "levothyroxine"], min(2, len(conditions))),
                 "hospitalizations_last_5_years": random.randint(0, 2) if age > 40 else 0,
@@ -751,21 +841,30 @@ def create_rate_tables(companies: List[Dict]) -> List[Dict]:
     return rate_tables
 
 
-def main():
+def main(force=False):
     """Main function to populate the database"""
     print("Starting database population...")
     print("=" * 50)
     
-    # Clear existing data
+    # Check if database already has data
+    companies_count = sync_db[Collections.COMPANIES].count_documents({})
+    
+    if companies_count > 0 and not force:
+        print(f"✅ Database already populated with {companies_count} companies")
+        print("🔄 To force repopulation, add --force flag")
+        return
+    
+    # Clear existing data (only runs if database was empty)
+    print("📊 Database is empty, populating with fresh data...")
     clear_database()
     
-    # Create data in order
-    companies = create_insurance_companies()
-    products = create_insurance_products(companies)
-    customers = create_customers(100)
-    quotes, policies = create_quotes_and_policies(customers, products)
-    claims = create_claims(policies)
-    rate_tables = create_rate_tables(companies)
+    # Create data in order (5x larger database)
+    companies = create_insurance_companies()  # 25 companies (was 5)
+    products = create_insurance_products(companies)  # ~125 products (was ~25)
+    customers = create_customers(500)  # 500 customers (was 100)
+    quotes, policies = create_quotes_and_policies(customers, products)  # ~2500 quotes, ~625 policies
+    claims = create_claims(policies)  # ~125 claims  
+    rate_tables = create_rate_tables(companies)  # 125 rate tables (was 25)
     
     # Print summary
     print("\n" + "=" * 50)
@@ -782,4 +881,10 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+    force = "--force" in sys.argv
+    
+    if force:
+        print("🔄 Force flag detected - will repopulate database")
+        
+    main(force=force)

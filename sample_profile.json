@@ -1,12 +1,18 @@
 {
-  "first_name": "Sarah",
-  "last_name": "Johnson",
-  "dob": "1988-03-15",
-  "gender": "F",
-  "email": "sarah.johnson@email.com",
-  "phone": "555-0123",
-  "address_line1": "456 Oak Avenue",
-  "city": "San Francisco",
-  "state": "CA",
-  "postal_code": "94105"
+    "full_name": "John Doe",
+    "age": 30,
+    "annual_income": 75000,
+    "occupation": "Software Engineer",
+    "email": "john.doe@email.com",
+    "phone": "555-123-4567",
+    "address": {
+        "street": "123 Main St",
+        "city": "San Francisco",
+        "state": "CA",
+        "zip_code": "94105"
+    },
+    "health_info": {
+        "height": "5'10\"",
+        "weight": "175 lbs"
+    }
 }
