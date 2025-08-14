@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claims Dashboard - Clearcover</title>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Fredoka', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-image: url('/static/images/background_img.png');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+        
+        /* Header */
+        .header {
+            background: transparent;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+        
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            cursor: pointer;
+        }
+        
+        .logo-container img {
+            height: 60px;
+            width: 60px;
+        }
+        
+        .logo-text {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .nav-icon {
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+            color: #666;
+        }
+        
+        /* Main Content */
+        .main-container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+        
+        .page-title {
+            font-size: 2rem;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .new-claim-btn {
+            background: #5ECDB9;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 25px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-family: 'Fredoka', sans-serif;
+        }
+        
+        .new-claim-btn:hover {
+            background: #4DB8A3;
+            transform: translateY(-1px);
+        }
+        
+        /* Claims Container */
+        .claims-container {
+            background: white;
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+        }
+        
+        /* Claims Table */
+        .claims-table {
+            width: 100%;
+        }
+        
+        .claim-row {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 1fr;
+            align-items: center;
+            padding: 1.5rem 0;
+            border-bottom: 1px solid #f0f0f0;
+            gap: 1rem;
+        }
+        
+        .claim-row:last-child {
+            border-bottom: none;
+        }
+        
+        .claim-info {
+            display: flex;
+            flex-direction: column;
+            gap: 0.3rem;
+        }
+        
+        .claim-type {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .claim-reference {
+            font-size: 0.8rem;
+            color: #666;
+        }
+        
+        .claim-amount {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .claim-ref-number {
+            font-size: 0.85rem;
+            color: #999;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 0.4rem 1rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            text-align: center;
+            min-width: 100px;
+        }
+        
+        .status-processing {
+            background: #E3F2FD;
+            color: #1976D2;
+        }
+        
+        .status-rejected {
+            background: #FFEBEE;
+            color: #D32F2F;
+        }
+        
+        .status-pending {
+            background: #FFF3E0;
+            color: #F57C00;
+        }
+        
+        .status-completed {
+            background: #E8F5E8;
+            color: #388E3C;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .claim-row {
+                grid-template-columns: 1fr;
+                gap: 0.5rem;
+                text-align: left;
+            }
+            
+            .claims-container {
+                padding: 1rem;
+            }
+            
+            body {
+                padding: 1rem;
+            }
+            
+            .page-header {
+                flex-direction: column;
+                gap: 1rem;
+                align-items: flex-start;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="logo-container" onclick="handleLogoClick()">
+            <img src="/static/images/logo.png" alt="Clearcover">
+            <span class="logo-text">Clearcover</span>
+        </div>
+        
+        <div class="header-actions">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M3 9L12 2L21 9V20C21 20.5304 20.7893 21.0391 20.4142 21.4142C20.0391 21.7893 19.5304 22 19 22H5C4.46957 22 3.96086 21.7893 3.58579 21.4142C3.21071 21.0391 3 20.5304 3 20V9Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M9 22V12H15V22" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M3 3H5L5.4 5M7 13H17L21 5H5.4M7 13L5.4 5M7 13L4.7 15.3C4.3 15.7 4.6 16.5 5.1 16.5H17M17 13V17C17 18.1 17.9 19 19 19S21 18.1 21 17V13M9 19.5C9.8 19.5 10.5 20.2 10.5 21S9.8 22.5 9 22.5 7.5 21.8 7.5 21 8.2 19.5 9 19.5ZM20 19.5C20.8 19.5 21.5 20.2 21.5 21S20.8 22.5 20 22.5 18.5 21.8 18.5 21 19.2 19.5 20 19.5Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </div>
+    </div>
+    
+    <!-- Main Content -->
+    <div class="main-container">
+        <!-- Page Header -->
+        <div class="page-header">
+            <h1 class="page-title">Claims</h1>
+            <button class="new-claim-btn" onclick="goToNewClaim()">New Claim</button>
+        </div>
+        
+        <!-- Claims Container -->
+        <div class="claims-container">
+            <div class="claims-table">
+                <!-- Surgery Insurance Claim -->
+                <div class="claim-row">
+                    <div class="claim-info">
+                        <div class="claim-type">Surgery Insurance Claim</div>
+                        <div class="claim-reference">Submitted 03/01/2025</div>
+                    </div>
+                    <div class="claim-amount">$9,600</div>
+                    <div class="claim-ref-number">Claim #2583001</div>
+                    <div class="status-badge status-processing">Processing</div>
+                </div>
+                
+                <!-- Hospitalisation Claim -->
+                <div class="claim-row">
+                    <div class="claim-info">
+                        <div class="claim-type">Hospitalisation Claim</div>
+                        <div class="claim-reference">Submitted 02/15/2025</div>
+                    </div>
+                    <div class="claim-amount">$5,000</div>
+                    <div class="claim-ref-number">Claim #2582009</div>
+                    <div class="status-badge status-rejected">Rejected</div>
+                </div>
+                
+                <!-- Dental Insurance Claim -->
+                <div class="claim-row">
+                    <div class="claim-info">
+                        <div class="claim-type">Dental Insurance Claim</div>
+                        <div class="claim-reference">Submitted 02/01/2025</div>
+                    </div>
+                    <div class="claim-amount">$2,400</div>
+                    <div class="claim-ref-number">Claim #2581008</div>
+                    <div class="status-badge status-pending">Pending</div>
+                </div>
+                
+                <!-- Car Insurance Claim -->
+                <div class="claim-row">
+                    <div class="claim-info">
+                        <div class="claim-type">Car Insurance Claim</div>
+                        <div class="claim-reference">Submitted 01/15/2025</div>
+                    </div>
+                    <div class="claim-amount">$11,000</div>
+                    <div class="claim-ref-number">Claim #2580567</div>
+                    <div class="status-badge status-completed">Completed</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        function handleLogoClick() {
+            const userData = localStorage.getItem('user_data');
+            if (userData) {
+                window.location.href = '/dashboard';
+            } else {
+                window.location.href = '/';
+            }
+        }
+        
+        function goToNewClaim() {
+            window.location.href = '/claims';
+        }
+        
+        // Load user claims from backend when page loads
+        document.addEventListener('DOMContentLoaded', async function() {
+            await loadUserClaims();
+        });
+        
+        async function loadUserClaims() {
+            try {
+                const userData = JSON.parse(localStorage.getItem('user_data') || '{}');
+                const userId = userData.email || 'demo_user';
+                
+                const response = await fetch(`http://localhost:8000/v1/user/${userId}/claims`);
+                if (response.ok) {
+                    const claimsData = await response.json();
+                    const userClaims = claimsData.claims || [];
+                    
+                    if (userClaims.length > 0) {
+                        displayUserClaims(userClaims);
+                    }
+                } else {
+                    console.warn('Failed to load claims from backend');
+                }
+            } catch (error) {
+                console.error('Error loading claims:', error);
+            }
+        }
+        
+        function displayUserClaims(claims) {
+            const claimsTable = document.querySelector('.claims-table');
+            
+            // If we have user claims, replace the demo data
+            claimsTable.innerHTML = claims.map(claim => {
+                const statusClass = getStatusClass(claim.status);
+                const formattedDate = new Date(claim.submitted_date || claim.created_at).toLocaleDateString();
+                
+                return `
+                    <div class="claim-row">
+                        <div class="claim-info">
+                            <div class="claim-type">${claim.claim_type || 'Insurance Claim'}</div>
+                            <div class="claim-reference">Submitted ${formattedDate}</div>
+                        </div>
+                        <div class="claim-amount">$${claim.claim_amount?.toLocaleString() || '0'}</div>
+                        <div class="claim-ref-number">Claim #${claim.claim_id || claim._id}</div>
+                        <div class="status-badge ${statusClass}">${formatStatus(claim.status)}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        function getStatusClass(status) {
+            const statusLower = (status || '').toLowerCase();
+            
+            if (statusLower.includes('process') || statusLower.includes('review')) {
+                return 'status-processing';
+            } else if (statusLower.includes('reject') || statusLower.includes('denied')) {
+                return 'status-rejected';
+            } else if (statusLower.includes('pending') || statusLower.includes('submitted')) {
+                return 'status-pending';
+            } else if (statusLower.includes('complete') || statusLower.includes('approved') || statusLower.includes('paid')) {
+                return 'status-completed';
+            }
+            
+            return 'status-pending';
+        }
+        
+        function formatStatus(status) {
+            if (!status) return 'Pending';
+            
+            return status.charAt(0).toUpperCase() + status.slice(1);
+        }
+    </script>
+</body>
+</html>

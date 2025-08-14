@@ -46,8 +46,7 @@ from backend.agents.option_selector_agent import QuestionnaireHelper
 from backend.agents.response_parser_agent import ResponseParser
 from backend.agents.recommendation_agent import RecommendationEngine
 from backend.agents.pdf_parser_agent import get_pdf_parser, PDFExtractionResult
-from backend.agents.policy_analyzer_agent import analyze_existing_policy
-from backend.agents.needs_evaluation_agent import get_needs_evaluation_agent
+from backend.agents.scoring_agent import get_scoring_agent, score_insurance_policies
 
 app = FastAPI(
     title="Insurance Questionnaire Server",
@@ -244,6 +243,46 @@ async def claims_page(request: Request):
         return templates.TemplateResponse("claims.html", {"request": request})
     else:
         return HTMLResponse("<h1>Claims page not available - templates not found</h1>")
+
+@app.get("/claims-dashboard", response_class=HTMLResponse)
+async def claims_dashboard_page(request: Request):
+    """Claims dashboard page"""
+    if templates:
+        return templates.TemplateResponse("claims_dashboard.html", {"request": request})
+    else:
+        return HTMLResponse("<h1>Claims dashboard page not available - templates not found</h1>")
+
+@app.get("/faq", response_class=HTMLResponse)
+async def faq_page(request: Request):
+    """FAQ/Support page"""
+    if templates:
+        return templates.TemplateResponse("faq.html", {"request": request})
+    else:
+        return HTMLResponse("<h1>FAQ page not available - templates not found</h1>")
+
+@app.get("/checkout", response_class=HTMLResponse)
+async def checkout_page(request: Request):
+    """Checkout/Shopping cart page"""
+    if templates:
+        return templates.TemplateResponse("checkout.html", {"request": request})
+    else:
+        return HTMLResponse("<h1>Checkout page not available - templates not found</h1>")
+
+@app.get("/payment", response_class=HTMLResponse)
+async def payment_page(request: Request):
+    """Payment page"""
+    if templates:
+        return templates.TemplateResponse("payment.html", {"request": request})
+    else:
+        return HTMLResponse("<h1>Payment page not available - templates not found</h1>")
+
+@app.get("/success", response_class=HTMLResponse)
+async def success_page(request: Request):
+    """Payment success page"""
+    if templates:
+        return templates.TemplateResponse("success.html", {"request": request})
+    else:
+        return HTMLResponse("<h1>Success page not available - templates not found</h1>")
 
 @app.post("/api/start-session")
 async def start_session():
@@ -442,26 +481,28 @@ async def start_session_with_profile(profile_data: Dict[str, Any]):
     # DO NOT auto-fill insurance preferences - that's what the questionnaire is for!
     # Only auto-fill basic personal info to speed up the process
     
-    # Add all auto-responses
+    # Auto-fill existing coverage questions since no PDF was uploaded (if not already answered)
+    existing_question_ids = {resp.question_id for resp in auto_responses}
+    
+    if "existing_coverage" not in existing_question_ids:
+        auto_responses.append(QuestionnaireResponse(
+            question_id="existing_coverage",
+            answer="none",
+            needs_help=False
+        ))
+    
+    if "current_coverage_amount" not in existing_question_ids:
+        auto_responses.append(QuestionnaireResponse(
+            question_id="current_coverage_amount", 
+            answer="none",
+            needs_help=False
+        ))
+    
+    # Add all auto-responses (now includes coverage questions)
     print(f"DEBUG: Created {len(auto_responses)} auto-responses:")
     for resp in auto_responses:
         print(f"  - {resp.question_id}: {resp.answer}")
     session.responses.extend(auto_responses)
-    
-    # Auto-fill existing coverage questions since no PDF was uploaded
-    auto_coverage_responses = [
-        QuestionnaireResponse(
-            question_id="existing_coverage",
-            answer="none",
-            needs_help=False
-        ),
-        QuestionnaireResponse(
-            question_id="current_coverage_amount", 
-            answer="none",
-            needs_help=False
-        )
-    ]
-    session.responses.extend(auto_coverage_responses)
     
     # Find first unanswered question
     answered_question_ids = {resp.question_id for resp in session.responses}
@@ -875,6 +916,46 @@ async def go_back_question(session_id: str):
         "current_question": current_question.dict() if current_question else None,
         "progress": calculate_progress(session)
     }
+
+@app.post("/api/session/{session_id}/previous")
+async def go_back_question(session_id: str):
+    """Go back to the previous question"""
+    try:
+        session = sessions.get(session_id)
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        # Find the current question index
+        current_index = session.current_question_index
+        
+        if current_index <= 0:
+            raise HTTPException(status_code=400, detail="Already at first question")
+        
+        # Remove the last response to "undo" it
+        if session.responses:
+            session.responses.pop()
+            
+        # Move back to previous question
+        session.current_question_index = current_index - 1
+        
+        # Update session
+        sessions[session_id] = session
+        await save_session_to_db(session)
+        
+        # Get the previous question
+        previous_question = None
+        if session.current_question_index < len(INSURANCE_QUESTIONS):
+            previous_question = INSURANCE_QUESTIONS[session.current_question_index]
+        
+        return {
+            "success": True,
+            "previous_question": previous_question.dict() if previous_question else None,
+            "progress": calculate_progress(session)
+        }
+        
+    except Exception as e:
+        print(f"DEBUG: Error going back: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to go back: {str(e)}")
 
 @app.post("/api/session/{session_id}/get-help")
 async def get_question_help(session_id: str, help_request: Dict[str, str]):
@@ -1814,11 +1895,52 @@ async def process_completed_questionnaire_agentic(session: QuestionnaireSession)
             quotes_data = await fetch_insurance_quotes_simple(insurance_request)
             print(f"DEBUG: Got quotes_data: {quotes_data}")
             
-            # Convert quotes to insurance cards for frontend display
+            # Convert quotes to insurance cards for frontend display with scoring
             if quotes_data.get("recommended_plans"):
                 print(f"DEBUG: Converting {len(quotes_data['recommended_plans'])} plans to insurance cards")
                 insurance_cards = []
+                
+                # Score all the plans using the scoring agent
+                import sys
+                import os
+                sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+                from insurance_backend.insurance_backend_mongo import QuotePlan
+                
+                quote_plans = []
                 for plan in quotes_data["recommended_plans"]:
+                    # Ensure all required fields are present with defaults
+                    plan_data = {
+                        "plan_id": plan.get("plan_id", f"plan_{len(quote_plans)}"),
+                        "plan_name": plan.get("plan_name", "Insurance Plan"),
+                        "company_id": plan.get("company_id", "company_1"),
+                        "company_name": plan.get("company_name", "Insurance Company"),
+                        "company_rating": plan.get("company_rating", 4.0),
+                        "coverage_amount": plan.get("coverage_amount", 100000.0),
+                        "deductible": plan.get("deductible", 1000.0),
+                        "base_premium": plan.get("base_premium", plan.get("total_monthly_premium", 100.0)),
+                        "rider_premiums": plan.get("rider_premiums", {}),
+                        "taxes_fees": plan.get("taxes_fees", plan.get("total_monthly_premium", 100.0) * 0.1),
+                        "total_monthly_premium": plan.get("total_monthly_premium", 100.0),
+                        "total_annual_premium": plan.get("total_annual_premium", plan.get("total_monthly_premium", 100.0) * 12),
+                        "coverage_details": plan.get("coverage_details", {}),
+                        "exclusions": plan.get("exclusions", []),
+                        "waiting_periods": plan.get("waiting_periods", {})
+                    }
+                    quote_plan = QuotePlan(**plan_data)
+                    quote_plans.append(quote_plan)
+                
+                # Convert user_profile to ApplicantProfile for scoring
+                applicant_profile = user_profile.to_applicant_data()
+                
+                # Score all plans
+                scored_plans = score_insurance_policies(quote_plans, applicant_profile)
+                print(f"DEBUG: Scored {len(scored_plans)} plans with metrics")
+                
+                # Create insurance cards with scoring - no fallbacks, this must work
+                for i, plan in enumerate(quotes_data["recommended_plans"]):
+                    # Get corresponding score
+                    plan_score = scored_plans[i]
+                    
                     card = {
                         "company_name": plan["company_name"],
                         "plan_name": plan["plan_name"],
@@ -1831,12 +1953,19 @@ async def process_completed_questionnaire_agentic(session: QuestionnaireSession)
                         ],
                         "company_rating": plan["company_rating"],
                         "deductible": plan.get("deductible", "None"),
-                        "plan_id": plan["plan_id"]
+                        "plan_id": plan["plan_id"],
+                        "metrics": {
+                            "affordability_score": plan_score.affordability_score,
+                            "ease_of_claims_score": plan_score.ease_of_claims_score,
+                            "coverage_ratio_score": plan_score.coverage_ratio_score
+                        }
                     }
+                    
+                    print(f"DEBUG: Added metrics to {plan['company_name']}: A={plan_score.affordability_score:.1f}, C={plan_score.ease_of_claims_score:.1f}, R={plan_score.coverage_ratio_score:.1f}")
                     insurance_cards.append(card)
-                
+
                 result["insurance_cards"] = insurance_cards
-                print(f"DEBUG: Created {len(insurance_cards)} insurance cards")
+                print(f"DEBUG: Created {len(insurance_cards)} insurance cards with metrics")
             
             result["new_quotes"] = quotes_data
             

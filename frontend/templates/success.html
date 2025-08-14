@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment Confirmed - Clearcover</title>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Fredoka', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-image: url('/static/images/background_img.png');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* Header */
+        .header {
+            background: transparent;
+            padding: 1.5rem 3rem;
+        }
+        
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            cursor: pointer;
+        }
+        
+        .logo-container img {
+            height: 120px;
+            width: 120px;
+        }
+        
+        .logo-text {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        /* Main Content */
+        .main-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 2rem;
+        }
+        
+        .success-icon {
+            width: 120px;
+            height: 120px;
+            margin-bottom: 2rem;
+            background: #5ECDB9;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        
+        .success-icon::before {
+            content: '✓';
+            color: white;
+            font-size: 4rem;
+            font-weight: bold;
+        }
+        
+        .success-title {
+            font-size: 2.5rem;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 1rem;
+        }
+        
+        .success-message {
+            font-size: 1.2rem;
+            color: #666;
+            margin-bottom: 3rem;
+        }
+        
+        .dashboard-btn {
+            background: #5ECDB9;
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            border-radius: 25px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+        }
+        
+        .dashboard-btn:hover {
+            background: #4DB8A3;
+            transform: translateY(-1px);
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="logo-container" onclick="handleLogoClick()">
+            <img src="/static/images/logo.png" alt="Clearcover">
+            <span class="logo-text">Clearcover</span>
+        </div>
+    </div>
+    
+    <!-- Main Content -->
+    <div class="main-container">
+        <div class="success-icon"></div>
+        <h1 class="success-title">Payment Confirmed</h1>
+        <p class="success-message">Thank you for using Clearcover!</p>
+        <a href="/dashboard" class="dashboard-btn">Back to Dashboard</a>
+    </div>
+    
+    <script>
+        function handleLogoClick() {
+            window.location.href = '/dashboard';
+        }
+    </script>
+</body>
+</html>

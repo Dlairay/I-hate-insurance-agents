@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FAQ - Clearcover</title>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Fredoka', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-image: url('/static/images/background_img.png');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            min-height: 100vh;
+        }
+        
+        /* Header */
+        .header {
+            background: transparent;
+            padding: 1.5rem 3rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            cursor: pointer;
+        }
+        
+        .logo-container img {
+            height: 80px;
+            width: 80px;
+        }
+        
+        .logo-text {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+            align-items: center;
+        }
+        
+        .nav-links a {
+            color: #666;
+            text-decoration: none;
+            font-size: 1rem;
+            font-weight: 500;
+            transition: color 0.3s;
+            cursor: pointer;
+        }
+        
+        .nav-links a:hover {
+            color: #333;
+        }
+        
+        .nav-links a.active {
+            color: #5ECDB9;
+            font-weight: 600;
+        }
+        
+        .login-btn {
+            background: #5ECDB9;
+            color: white;
+            padding: 0.6rem 1.5rem;
+            border-radius: 25px;
+            text-decoration: none;
+            transition: all 0.3s;
+            font-weight: 500;
+        }
+        
+        .login-btn:hover {
+            background: #4DB8A3;
+            transform: translateY(-1px);
+        }
+        
+        /* Main Content */
+        .main-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        .page-title {
+            font-size: 2rem;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 2rem;
+        }
+        
+        /* FAQ Sections */
+        .faq-section {
+            margin-bottom: 2rem;
+        }
+        
+        .section-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 1rem;
+        }
+        
+        .faq-item {
+            background: white;
+            border-radius: 15px;
+            margin-bottom: 0.8rem;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .faq-item:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+        }
+        
+        .faq-question {
+            padding: 1.2rem 1.5rem;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background 0.3s;
+        }
+        
+        .faq-question:hover {
+            background: #f8f9fa;
+        }
+        
+        .question-text {
+            font-size: 1rem;
+            color: #666;
+            font-weight: 500;
+        }
+        
+        .dropdown-arrow {
+            font-size: 1.2rem;
+            color: #666;
+            transition: transform 0.3s;
+        }
+        
+        .faq-item.active .dropdown-arrow {
+            transform: rotate(180deg);
+        }
+        
+        .faq-answer {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+            background: #f8f9fa;
+        }
+        
+        .faq-item.active .faq-answer {
+            max-height: 200px;
+        }
+        
+        .answer-content {
+            padding: 1.5rem;
+            color: #555;
+            line-height: 1.6;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header {
+                padding: 1rem 1.5rem;
+                flex-direction: column;
+                gap: 1rem;
+            }
+            
+            .nav-links {
+                gap: 1.5rem;
+            }
+            
+            .main-container {
+                padding: 1rem;
+            }
+            
+            .page-title {
+                font-size: 1.5rem;
+            }
+            
+            .logo-container img {
+                height: 60px;
+                width: 60px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="logo-container" onclick="handleLogoClick()">
+            <img src="/static/images/logo.png" alt="Clearcover">
+            <span class="logo-text">Clearcover</span>
+        </div>
+        
+        <div class="nav-links">
+            <a href="#about">About Us</a>
+            <a href="/login?redirect=claims">Claims</a>
+            <a href="/faq" class="active">Support</a>
+            <a href="/login" class="login-btn">Log In</a>
+        </div>
+    </div>
+    
+    <!-- Main Content -->
+    <div class="main-container">
+        <h1 class="page-title">Frequently Asked Questions (FAQs)</h1>
+        
+        <!-- General Insurance Section -->
+        <div class="faq-section">
+            <h2 class="section-title">1. General Insurance</h2>
+            
+            <div class="faq-item">
+                <div class="faq-question" onclick="toggleFAQ(this)">
+                    <span class="question-text">What types of insurance do you offer?</span>
+                    <span class="dropdown-arrow">▼</span>
+                </div>
+                <div class="faq-answer">
+                    <div class="answer-content">
+                        We offer comprehensive insurance coverage including Health Insurance (Basic and Premium plans), Critical Illness Insurance, Life Insurance (Term and Whole Life), and supplementary coverage such as Disability and Accidental Death benefits.
+                    </div>
+                </div>
+            </div>
+            
+            <div class="faq-item">
+                <div class="faq-question" onclick="toggleFAQ(this)">
+                    <span class="question-text">What documents do I need to upload for a quote?</span>
+                    <span class="dropdown-arrow">▼</span>
+                </div>
+                <div class="faq-answer">
+                    <div class="answer-content">
+                        You can upload existing insurance documents, medical records, or income statements. Our AI system can extract relevant information to provide more accurate quotes. However, you can also complete the process without uploading any documents.
+                    </div>
+                </div>
+            </div>
+            
+            <div class="faq-item">
+                <div class="faq-question" onclick="toggleFAQ(this)">
+                    <span class="question-text">How does your AI agent help me choose the right plan?</span>
+                    <span class="dropdown-arrow">▼</span>
+                </div>
+                <div class="faq-answer">
+                    <div class="answer-content">
+                        Our AI agent analyzes your personal information, lifestyle factors, and coverage needs to provide personalized recommendations. It uses a 3-metric scoring system (affordability, claims ease, coverage ratio) to rank plans based on your specific situation and budget.
+                    </div>
+                </div>
+            </div>
+            
+            <div class="faq-item">
+                <div class="faq-question" onclick="toggleFAQ(this)">
+                    <span class="question-text">Can I buy a policy entirely online?</span>
+                    <span class="dropdown-arrow">▼</span>
+                </div>
+                <div class="faq-answer">
+                    <div class="answer-content">
+                        Yes! Our platform allows you to complete the entire insurance purchase process online. From getting quotes to making payments and receiving your policy documents, everything can be done digitally through our secure platform.
+                    </div>
+                </div>
+            </div>
+            
+            <div class="faq-item">
+                <div class="faq-question" onclick="toggleFAQ(this)">
+                    <span class="question-text">Is my data safe when I use your platform?</span>
+                    <span class="dropdown-arrow">▼</span>
+                </div>
+                <div class="faq-answer">
+                    <div class="answer-content">
+                        Absolutely. We use industry-standard encryption and security measures to protect your personal and financial information. All data is stored securely and we never share your information with unauthorized third parties.
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Pricing & Coverage Section -->
+        <div class="faq-section">
+            <h2 class="section-title">2. Pricing & Coverage FAQs</h2>
+            
+            <div class="faq-item">
+                <div class="faq-question" onclick="toggleFAQ(this)">
+                    <span class="question-text">How are my premiums calculated?</span>
+                    <span class="dropdown-arrow">▼</span>
+                </div>
+                <div class="faq-answer">
+                    <div class="answer-content">
+                        Premiums are calculated based on multiple factors including your age, health status, lifestyle habits, coverage amount, and location. Our system also considers smoking habits, exercise frequency, and any high-risk activities you participate in.
+                    </div>
+                </div>
+            </div>
+            
+            <div class="faq-item">
+                <div class="faq-question" onclick="toggleFAQ(this)">
+                    <span class="question-text">Does participating in high-risk activities affect my insurance?</span>
+                    <span class="dropdown-arrow">▼</span>
+                </div>
+                <div class="faq-answer">
+                    <div class="answer-content">
+                        Yes, high-risk activities like skydiving, racing, or extreme sports can affect your premium rates. However, we evaluate each case individually and provide transparent pricing based on your specific risk profile.
+                    </div>
+                </div>
+            </div>
+            
+            <div class="faq-item">
+                <div class="faq-question" onclick="toggleFAQ(this)">
+                    <span class="question-text">What is not covered by my policy?</span>
+                    <span class="dropdown-arrow">▼</span>
+                </div>
+                <div class="faq-answer">
+                    <div class="answer-content">
+                        Exclusions vary by policy type but typically include pre-existing conditions not disclosed during application, self-inflicted injuries, illegal activities, and certain experimental treatments. Full exclusion details are provided in your policy documents.
+                    </div>
+                </div>
+            </div>
+            
+            <div class="faq-item">
+                <div class="faq-question" onclick="toggleFAQ(this)">
+                    <span class="question-text">How can I lower my insurance premium?</span>
+                    <span class="dropdown-arrow">▼</span>
+                </div>
+                <div class="faq-answer">
+                    <div class="answer-content">
+                        You can lower premiums by maintaining a healthy lifestyle, choosing higher deductibles, bundling multiple policies, and avoiding high-risk activities. Regular health check-ups and non-smoking status also help reduce rates.
+                    </div>
+                </div>
+            </div>
+            
+            <div class="faq-item">
+                <div class="faq-question" onclick="toggleFAQ(this)">
+                    <span class="question-text">Can I customise my coverage based on my lifestyle?</span>
+                    <span class="dropdown-arrow">▼</span>
+                </div>
+                <div class="faq-answer">
+                    <div class="answer-content">
+                        Absolutely! Our platform offers flexible coverage options that can be tailored to your specific lifestyle and needs. You can add riders, adjust coverage amounts, and choose deductibles that match your budget and risk tolerance.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        function toggleFAQ(questionElement) {
+            const faqItem = questionElement.parentElement;
+            const wasActive = faqItem.classList.contains('active');
+            
+            // Close all FAQ items
+            document.querySelectorAll('.faq-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            
+            // If this item wasn't active, open it
+            if (!wasActive) {
+                faqItem.classList.add('active');
+            }
+        }
+        
+        function handleLogoClick() {
+            const userData = localStorage.getItem('user_data');
+            if (userData) {
+                window.location.href = '/dashboard';
+            } else {
+                window.location.href = '/';
+            }
+        }
+        
+        // Close FAQ if clicking outside
+        document.addEventListener('click', function(event) {
+            if (!event.target.closest('.faq-item')) {
+                document.querySelectorAll('.faq-item').forEach(item => {
+                    item.classList.remove('active');
+                });
+            }
+        });
+    </script>
+</body>
+</html>

@@ -17,8 +17,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Initialize Ollama model
-ollama_model = LiteLlm(model="ollama_chat/llama3:latest")
+# Initialize Ollama model  
+ollama_model = LiteLlm(model="ollama_chat/llama3")
 
 def analyze_user_input(user_description: str, question_data: dict) -> dict:
     """
@@ -104,72 +104,9 @@ class OptionSelectorHelper:
     
     async def select_option(self, user_description: str, question: dict, previous_answers: dict = None) -> str:
         """
-        Interpret user's natural language and select the best option
-        
-        Args:
-            user_description: What the user typed in the text box
-            question: Question object with options
-            previous_answers: Previous answers for context (optional)
-            
-        Returns:
-            The option value that best matches the user's description
+        Simple text matching - no AI bullshit needed
         """
-        await self.initialize()
-        
-        # Create the prompt
-        options_text = "\n".join([
-            f"- {opt.get('value', '')}: {opt.get('label', '')}"
-            for opt in question.get('options', [])
-        ])
-        
-        prompt = f"""
-USER SAID: "{user_description}"
-
-QUESTION: {question.get('question_text', '')}
-
-AVAILABLE OPTIONS:
-{options_text}
-
-Based on what the user described, which option VALUE best matches their situation?
-Use the analyze_user_input tool to understand their input, then return ONLY the option value.
-        """
-        
-        try:
-            session = await self.session_service.get_session(
-                app_name=self.app_name,
-                session_id="default"
-            )
-            
-            # Create message content
-            content = types.Content(role='user', parts=[types.Part(text=prompt)])
-            
-            # Process with the agent
-            result = None
-            async for event in self.runner.run_async(
-                user_id="user",
-                session_id="default",
-                new_message=content
-            ):
-                if event.is_final_response():
-                    if event.content and event.content.parts:
-                        result = event.content.parts[0].text
-                    break
-            
-            # Extract the option value from the response
-            response_text = result if result else ""
-            
-            # Look for a valid option value in the response
-            option_values = [opt.get('value', '') for opt in question.get('options', [])]
-            for value in option_values:
-                if value in response_text:
-                    return value
-            
-            # Fallback to rule-based interpretation if AI fails
-            return self._rule_based_fallback(user_description, question)
-            
-        except Exception as e:
-            print(f"❌ AI option selector error: {e}")
-            return self._rule_based_fallback(user_description, question)
+        return self._rule_based_fallback(user_description, question)
     
     def _rule_based_fallback(self, user_description: str, question: dict) -> str:
         """

@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Choose Your Plan - Clearcover</title>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
     <style>
         * {
@@ -13,7 +14,7 @@
         }
         
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            font-family: 'Fredoka', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             background-image: url('/static/images/background_img.png');
             background-size: cover;
             background-position: center;
@@ -24,9 +25,11 @@
         
         /* Header */
         .header {
-            background: white;
+            background: transparent;
             padding: 1.5rem 3rem;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
         
         .logo-container {
@@ -36,8 +39,8 @@
         }
         
         .logo-container img {
-            height: 40px;
-            width: 40px;
+            height: 120px;
+            width: 120px;
         }
         
         .logo-text {
@@ -48,9 +51,8 @@
         
         /* Progress Steps */
         .progress-container {
-            background: white;
+            background: transparent;
             padding: 2rem 3rem;
-            border-bottom: 1px solid #eee;
         }
         
         .progress-steps {
@@ -73,11 +75,15 @@
             content: '';
             position: absolute;
             top: 30px;
-            left: 50%;
-            width: 100%;
-            height: 2px;
-            background: #5ECDB9;
+            left: calc(50% + 30px);
+            width: calc(100% - 60px);
+            height: 3px;
+            background: #ddd;
             z-index: -1;
+        }
+        
+        .step.completed::after {
+            background: #5ECDB9;
         }
         
         .step-icon {
@@ -94,40 +100,46 @@
         }
         
         .step.completed .step-icon {
-            background: #5ECDB9;
+            background: #28a745;
         }
         
         .step.active .step-icon {
-            background: #4169E1;
+            background: #007BFF;
             animation: pulse 2s infinite;
         }
         
         @keyframes pulse {
             0% {
-                box-shadow: 0 0 0 0 rgba(65, 105, 225, 0.4);
+                box-shadow: 0 0 0 0 rgba(0, 123, 255, 0.4);
             }
             70% {
-                box-shadow: 0 0 0 10px rgba(65, 105, 225, 0);
+                box-shadow: 0 0 0 10px rgba(0, 123, 255, 0);
             }
             100% {
-                box-shadow: 0 0 0 0 rgba(65, 105, 225, 0);
+                box-shadow: 0 0 0 0 rgba(0, 123, 255, 0);
             }
         }
         
         .step-label {
-            font-size: 0.85rem;
+            font-size: 0.8rem;
             color: #666;
             text-align: center;
+            font-weight: 500;
         }
         
         .step.active .step-label {
-            color: #333;
+            color: #007BFF;
+            font-weight: 600;
+        }
+        
+        .step.completed .step-label {
+            color: #28a745;
             font-weight: 600;
         }
         
         /* Main Content */
         .main-container {
-            padding: 3rem;
+            padding: 1rem 3rem;
             max-width: 1400px;
             margin: 0 auto;
         }
@@ -142,7 +154,8 @@
         /* Plans Carousel */
         .plans-container {
             position: relative;
-            overflow: hidden;
+            overflow: visible;
+            padding: 0 60px;
         }
         
         .plans-carousel {
@@ -154,12 +167,14 @@
         
         /* Plan Card */
         .plan-card {
-            background: white;
-            border-radius: 15px;
-            padding: 2rem;
-            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
-            min-width: 350px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 2.5rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            min-width: 380px;
             position: relative;
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }
         
         .plan-header {
@@ -174,16 +189,17 @@
         }
         
         .company-name {
-            font-size: 1.3rem;
-            font-weight: 600;
-            color: #333;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #2C3E50;
             margin-bottom: 0.5rem;
         }
         
         .plan-price {
-            font-size: 1.8rem;
+            font-size: 2.2rem;
             font-weight: 700;
-            color: #333;
+            color: #5ECDB9;
+            margin: 0.5rem 0;
         }
         
         .price-period {
@@ -243,16 +259,16 @@
         .metric-bar {
             flex: 1;
             margin: 0 1rem;
-            height: 8px;
-            background: #f0f0f0;
-            border-radius: 4px;
+            height: 6px;
+            background: #E8F5F3;
+            border-radius: 10px;
             overflow: hidden;
         }
         
         .metric-fill {
             height: 100%;
-            background: linear-gradient(90deg, #5ECDB9, #4DB8A3);
-            border-radius: 4px;
+            background: #5ECDB9;
+            border-radius: 10px;
             transition: width 0.5s ease;
         }
         
@@ -311,7 +327,7 @@
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
             cursor: pointer;
             transition: all 0.3s;
-            z-index: 10;
+            z-index: 1000;
         }
         
         .carousel-nav:hover {
@@ -319,11 +335,11 @@
         }
         
         .carousel-nav.prev {
-            left: -20px;
+            left: 10px;
         }
         
         .carousel-nav.next {
-            right: -20px;
+            right: 10px;
         }
         
         /* Pagination Dots */
@@ -349,6 +365,181 @@
             border-radius: 5px;
         }
         
+        /* Plan Details Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+        
+        .modal-content {
+            background: white;
+            border-radius: 20px;
+            padding: 0;
+            max-width: 1000px;
+            width: 90%;
+            max-height: 80vh;
+            overflow: hidden;
+            position: relative;
+            display: flex;
+        }
+        
+        .modal-left {
+            flex: 1;
+            padding: 2rem;
+            background: white;
+            border-radius: 20px 0 0 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal-right {
+            flex: 1;
+            padding: 2rem;
+            background: #E8F4FF;
+            border-radius: 0 20px 20px 0;
+            overflow-y: auto;
+        }
+        
+        .modal-right h3 {
+            color: #333;
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+        
+        .modal-right ul {
+            list-style: none;
+            padding: 0;
+            margin-bottom: 1.5rem;
+        }
+        
+        .modal-right li {
+            color: #333;
+            font-size: 0.95rem;
+            margin-bottom: 0.8rem;
+            padding-left: 1rem;
+            position: relative;
+        }
+        
+        .modal-right li::before {
+            content: "•";
+            color: #333;
+            font-weight: bold;
+            position: absolute;
+            left: 0;
+        }
+        
+        .modal-section {
+            margin-bottom: 1.5rem;
+        }
+        
+        .modal-section:last-child {
+            margin-bottom: 0;
+        }
+        
+        .modal-close {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #666;
+            padding: 0.5rem;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal-close:hover {
+            background: #f5f5f5;
+        }
+        
+        .modal-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 1rem;
+            padding-right: 3rem;
+        }
+        
+        .detail-section {
+            margin-bottom: 1.5rem;
+        }
+        
+        .detail-section h4 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 0.5rem;
+        }
+        
+        .detail-list {
+            list-style: none;
+            padding: 0;
+        }
+        
+        .detail-list li {
+            padding: 0.3rem 0;
+            color: #666;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        .detail-list li:last-child {
+            border-bottom: none;
+        }
+        
+        .detail-value {
+            font-weight: 500;
+            color: #333;
+        }
+        
+        /* Notification */
+        .notification {
+            position: fixed;
+            top: 2rem;
+            right: 2rem;
+            background: #5ECDB9;
+            color: white;
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            z-index: 9999;
+            transform: translateX(400px);
+            transition: transform 0.3s ease;
+            font-weight: 500;
+        }
+        
+        .notification.show {
+            transform: translateX(0);
+        }
+        
+        .notification.warning {
+            background: #f39c12;
+        }
+        
+        .notification.error {
+            background: #e74c3c;
+        }
+        
+        .notification.success {
+            background: #5ECDB9;
+        }
+
         @media (max-width: 768px) {
             .header {
                 padding: 1rem 1.5rem;
@@ -369,15 +560,31 @@
             .plan-card {
                 min-width: 280px;
             }
+            
+            .notification {
+                top: 1rem;
+                right: 1rem;
+                left: 1rem;
+                transform: translateY(-100px);
+            }
+            
+            .notification.show {
+                transform: translateY(0);
+            }
         }
     </style>
 </head>
 <body>
     <!-- Header -->
     <div class="header">
-        <div class="logo-container">
+        <div class="logo-container" onclick="handleLogoClick()" style="cursor: pointer;">
             <img src="/static/images/logo.png" alt="Clearcover">
             <span class="logo-text">Clearcover</span>
+        </div>
+        <div class="header-actions">
+            <button class="btn btn-secondary" onclick="goToCheckout()" style="background: #5ECDB9; color: white; border: none;">
+                Checkout (<span id="cartCount">0</span>)
+            </button>
         </div>
     </div>
     
@@ -385,7 +592,9 @@
     <div class="progress-container">
         <div class="progress-steps">
             <div class="step completed">
-                <div class="step-icon">✓</div>
+                <div class="step-icon">
+                    <img src="/static/images/tick_3.png" alt="Completed" style="width: 30px; height: 30px;">
+                </div>
                 <div class="step-label">
                     STEP 1<br>
                     Upload Documents
@@ -393,7 +602,9 @@
             </div>
             
             <div class="step completed">
-                <div class="step-icon">✓</div>
+                <div class="step-icon">
+                    <img src="/static/images/tick_3.png" alt="Completed" style="width: 30px; height: 30px;">
+                </div>
                 <div class="step-label">
                     STEP 2<br>
                     Consultation
@@ -401,7 +612,9 @@
             </div>
             
             <div class="step active">
-                <div class="step-icon">📋</div>
+                <div class="step-icon">
+                    <img src="/static/images/progress_bar_selection.png" alt="Choose Plan" style="width: 30px; height: 30px;">
+                </div>
                 <div class="step-label">
                     STEP 3<br>
                     Choose your plan
@@ -412,8 +625,6 @@
     
     <!-- Main Content -->
     <div class="main-container">
-        <h1 class="page-title">Choose your plan</h1>
-        
         <div class="plans-container">
             <div class="carousel-nav prev" onclick="slidePlans(-1)">‹</div>
             <div class="carousel-nav next" onclick="slidePlans(1)">›</div>
@@ -612,12 +823,179 @@
         </div>
     </div>
     
+    <!-- Plan Details Modal -->
+    <div class="modal-overlay" id="planDetailsModal">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closePlanDetails()">&times;</button>
+            <div id="modalContent" style="display: flex; height: 100%;">
+                <!-- Content will be populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+    
     <script>
         let currentSlide = 0;
-        const carousel = document.getElementById('plansCarousel');
-        const dots = document.querySelectorAll('.dot');
+        let carousel;
+        let dots;
+        let recommendationsData = null;
+        
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', async function() {
+            // Check if we're coming from a fresh questionnaire session
+            const urlParams = new URLSearchParams(window.location.search);
+            const sessionId = urlParams.get('session');
+            
+            if (sessionId) {
+                // Fresh session from questionnaire - start with empty cart
+                console.log('🧹 Fresh session detected, starting with empty cart');
+                localStorage.removeItem('insurance_cart');
+                cart = [];
+            } else {
+                // Not from questionnaire, load existing cart if any
+                console.log('📦 Loading existing cart from localStorage');
+                cart = JSON.parse(localStorage.getItem('insurance_cart')) || [];
+            }
+            
+            console.log('🛒 Cart initialized with', cart.length, 'items');
+            updateCartCount();
+            
+            await loadRecommendations();
+        });
+        
+        async function loadRecommendations() {
+            try {
+                // Get session ID from URL parameters
+                const urlParams = new URLSearchParams(window.location.search);
+                const sessionId = urlParams.get('session');
+                
+                if (!sessionId) {
+                    console.error('No session ID provided');
+                    return;
+                }
+                
+                // Fetch recommendations data
+                const response = await fetch(`/api/recommendations/${sessionId}`);
+                if (!response.ok) {
+                    throw new Error(`Failed to load recommendations: ${response.status}`);
+                }
+                
+                recommendationsData = await response.json();
+                console.log('Loaded recommendations:', recommendationsData);
+                
+                // Render the plans
+                renderPlans(recommendationsData.recommendations.insurance_cards || []);
+                
+            } catch (error) {
+                console.error('Error loading recommendations:', error);
+                // Keep the hardcoded plans as fallback
+            }
+        }
+        
+        function renderPlans(insuranceCards) {
+            const carouselContainer = document.getElementById('plansCarousel');
+            const paginationContainer = document.querySelector('.pagination');
+            
+            if (!insuranceCards || insuranceCards.length === 0) {
+                console.warn('No insurance cards to render, keeping hardcoded plans');
+                return;
+            }
+            
+            // Clear existing content
+            carouselContainer.innerHTML = '';
+            paginationContainer.innerHTML = '';
+            
+            // Render each plan
+            insuranceCards.forEach((card, index) => {
+                const planCard = createPlanCard(card, index);
+                carouselContainer.appendChild(planCard);
+                
+                // Create pagination dot
+                const dot = document.createElement('span');
+                dot.className = index === 0 ? 'dot active' : 'dot';
+                dot.onclick = () => goToSlide(index);
+                paginationContainer.appendChild(dot);
+            });
+            
+            // Update carousel references
+            carousel = document.getElementById('plansCarousel');
+            dots = document.querySelectorAll('.dot');
+            currentSlide = 0;
+        }
+        
+        function createPlanCard(card, index) {
+            const planDiv = document.createElement('div');
+            planDiv.className = 'plan-card';
+            
+            // Extract metrics from the card (keeping the 3 existing metrics)
+            const metrics = card.metrics || {};
+            console.log('📊 Card metrics for', card.company_name, ':', metrics);
+            
+            // Calculate annual cost from monthly cost
+            let annualCost = 'N/A';
+            if (card.monthly_cost) {
+                const monthlyMatch = card.monthly_cost.match(/\$(\d+(?:\.\d+)?)/);
+                if (monthlyMatch) {
+                    annualCost = (parseFloat(monthlyMatch[1]) * 12).toLocaleString();
+                }
+            }
+            
+            planDiv.innerHTML = `
+                <div class="plan-header">
+                    <div class="company-info">
+                        <h3 class="company-name">${card.company_name || 'Unknown Company'}</h3>
+                        <div class="plan-price">
+                            $${annualCost}<span class="price-period">/year</span>
+                        </div>
+                        <div class="claim-amount">Maximum claimable amount: ${card.coverage_amount || 'N/A'}</div>
+                    </div>
+                    <div class="plan-badge ${getBadgeClass(card.recommendation_label || '')}">${card.recommendation_label || 'Standard'}</div>
+                </div>
+                
+                <div class="coverage-metrics">
+                    <div class="metric-row">
+                        <span class="metric-label">Affordability</span>
+                        <div class="metric-bar">
+                            <div class="metric-fill" style="width: ${metrics.affordability_score || 50}%"></div>
+                        </div>
+                        <span class="metric-value">${Math.round(metrics.affordability_score || 50)}%</span>
+                    </div>
+                    
+                    <div class="metric-row">
+                        <span class="metric-label">Ease of Claims</span>
+                        <div class="metric-bar">
+                            <div class="metric-fill" style="width: ${metrics.ease_of_claims_score || 50}%"></div>
+                        </div>
+                        <span class="metric-value">${Math.round(metrics.ease_of_claims_score || 50)}%</span>
+                    </div>
+                    
+                    <div class="metric-row">
+                        <span class="metric-label">Coverage Ratio</span>
+                        <div class="metric-bar">
+                            <div class="metric-fill" style="width: ${metrics.coverage_ratio_score || 50}%"></div>
+                        </div>
+                        <span class="metric-value">${Math.round(metrics.coverage_ratio_score || 50)}%</span>
+                    </div>
+                </div>
+                
+                <div class="card-actions">
+                    <button class="btn btn-primary" onclick="addToCart('${card.company_name}', '${card.plan_id || ''}', ${index})">Add to cart</button>
+                    <button class="btn btn-secondary" onclick="showPlanDetails(${index})">View details</button>
+                </div>
+            `;
+            
+            return planDiv;
+        }
+        
+        function getBadgeClass(label) {
+            const labelLower = label.toLowerCase();
+            if (labelLower.includes('approval')) return 'high-approval';
+            if (labelLower.includes('network')) return 'largest-network';
+            return '';
+        }
         
         function slidePlans(direction) {
+            if (!carousel || !dots) return;
+            
             const cards = document.querySelectorAll('.plan-card');
             const totalSlides = cards.length;
             
@@ -635,7 +1013,9 @@
         }
         
         function updateCarousel() {
-            const cardWidth = 380; // card width + gap
+            if (!carousel || !dots) return;
+            
+            const cardWidth = 400; // card width + gap
             carousel.style.transform = `translateX(-${currentSlide * cardWidth}px)`;
             
             // Update dots
@@ -644,12 +1024,203 @@
             });
         }
         
-        function selectPlan(company) {
-            alert(`You have selected the plan from ${company}. Proceeding to payment...`);
-            // In a real app, this would navigate to a payment page
+        function showPlanDetails(planIndex) {
+            if (!recommendationsData || !recommendationsData.recommendations.insurance_cards) {
+                alert('No plan details available');
+                return;
+            }
+            
+            const plan = recommendationsData.recommendations.insurance_cards[planIndex];
+            if (!plan) {
+                alert('Plan not found');
+                return;
+            }
+            
+            // Calculate annual cost
+            let annualCost = 'N/A';
+            if (plan.monthly_cost) {
+                const monthlyMatch = plan.monthly_cost.match(/\$(\d+(?:\.\d+)?)/);
+                if (monthlyMatch) {
+                    annualCost = (parseFloat(monthlyMatch[1]) * 12).toLocaleString();
+                }
+            }
+            
+            const modalContent = document.getElementById('modalContent');
+            modalContent.innerHTML = `
+                <div class="modal-left">
+                    <div class="plan-card">
+                        <div class="plan-header">
+                            <div class="company-info">
+                                <h3 class="company-name">${plan.company_name || 'Unknown Company'}</h3>
+                                <div class="plan-price">
+                                    $${annualCost}<span class="price-period">/year</span>
+                                </div>
+                                <div class="claim-amount">Maximum claimable amount: ${plan.coverage_amount || 'N/A'}</div>
+                            </div>
+                            <div class="plan-badge ${getBadgeClass(plan.recommendation_label || '')}">
+                                ${plan.recommendation_label || 'Standard'}
+                            </div>
+                        </div>
+                        
+                        <div class="coverage-metrics">
+                            <div class="metric-row">
+                                <span class="metric-label">Affordability</span>
+                                <div class="metric-bar">
+                                    <div class="metric-fill" style="width: ${plan.metrics?.affordability_score || 50}%"></div>
+                                </div>
+                                <span class="metric-value">${Math.round(plan.metrics?.affordability_score || 50)}%</span>
+                            </div>
+                            
+                            <div class="metric-row">
+                                <span class="metric-label">Ease of Claims</span>
+                                <div class="metric-bar">
+                                    <div class="metric-fill" style="width: ${plan.metrics?.ease_of_claims_score || 50}%"></div>
+                                </div>
+                                <span class="metric-value">${Math.round(plan.metrics?.ease_of_claims_score || 50)}%</span>
+                            </div>
+                            
+                            <div class="metric-row">
+                                <span class="metric-label">Coverage Ratio</span>
+                                <div class="metric-bar">
+                                    <div class="metric-fill" style="width: ${plan.metrics?.coverage_ratio_score || 50}%"></div>
+                                </div>
+                                <span class="metric-value">${Math.round(plan.metrics?.coverage_ratio_score || 50)}%</span>
+                            </div>
+                        </div>
+                        
+                    </div>
+                </div>
+                
+                <div class="modal-right">
+                    <h3>Details</h3>
+                    
+                    <div class="modal-section">
+                        <ul>
+                            <li>${plan.monthly_cost || 'Monthly cost not available'}</li>
+                            <li>Fully covered for all types of hospitalisation</li>
+                            <li>Lacks niche benefits like mental health or maternity</li>
+                            <li>High payout ceilings and no significant copayments for inpatient care</li>
+                            <li>Claim processing speed: ~${Math.floor(Math.random() * 10) + 8} working days average</li>
+                            <li>Allows add-ons (e.g. dental, maternity) but limited customisation in base plan</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="modal-section">
+                        <h3>What's not covered in the base plan?</h3>
+                        <p>Mental health and maternity, cosmetic/elective treatments</p>
+                    </div>
+                    
+                    <div style="text-align: center; margin-top: 2rem;">
+                        <button class="btn btn-primary" onclick="addToCart('${plan.company_name}', '${plan.plan_id || ''}', ${planIndex}); closePlanDetails();" 
+                                style="background: #5ECDB9; padding: 1rem 2rem; border-radius: 25px; font-size: 1rem;">
+                            Add to cart
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('planDetailsModal').style.display = 'flex';
+        }
+        
+        function closePlanDetails() {
+            document.getElementById('planDetailsModal').style.display = 'none';
+        }
+        
+        // Close modal when clicking outside
+        document.getElementById('planDetailsModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closePlanDetails();
+            }
+        });
+        
+        // Cart functionality - Initialize as empty, will load from localStorage later if needed
+        let cart = [];
+        
+        function updateCartCount() {
+            console.log('📊 Updating cart count to:', cart.length);
+            document.getElementById('cartCount').textContent = cart.length;
+        }
+        
+        function addToCart(company, planId, planIndex) {
+            console.log('🔥 addToCart called with:', { company, planId, planIndex });
+            console.trace('Call stack for addToCart');
+            
+            const plan = recommendationsData?.recommendations?.insurance_cards?.[planIndex];
+            if (!plan) {
+                alert('Plan data not available');
+                return;
+            }
+            
+            // Check if already in cart
+            const existingItem = cart.find(item => item.plan_id === planId && item.company_name === company);
+            if (existingItem) {
+                showNotification('This plan is already in your cart', 'warning');
+                return;
+            }
+            
+            // Add to cart
+            console.log('➕ Adding item to cart...');
+            const cartItem = {
+                plan_id: planId || `${company}_${Date.now()}`,
+                company_name: company,
+                plan_name: plan.plan_name || `${company} Plan`,
+                monthly_cost: plan.monthly_cost || 'N/A',
+                coverage_amount: plan.coverage_amount || 'N/A',
+                metrics: plan.metrics || {},
+                recommendation_label: plan.recommendation_label || 'Standard'
+            };
+            
+            cart.push(cartItem);
+            localStorage.setItem('insurance_cart', JSON.stringify(cart));
+            updateCartCount();
+            
+            showNotification(`Added ${company} plan to cart!`, 'success');
+        }
+        
+        function goToCheckout() {
+            window.location.href = '/checkout';
+        }
+        
+        // Notification system
+        function showNotification(message, type = 'success') {
+            // Remove existing notification
+            const existing = document.querySelector('.notification');
+            if (existing) {
+                existing.remove();
+            }
+            
+            // Create new notification
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.textContent = message;
+            
+            document.body.appendChild(notification);
+            
+            // Show notification
             setTimeout(() => {
+                notification.classList.add('show');
+            }, 100);
+            
+            // Hide notification after 3 seconds
+            setTimeout(() => {
+                notification.classList.remove('show');
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.parentNode.removeChild(notification);
+                    }
+                }, 300);
+            }, 3000);
+        }
+        
+        // Cart count is already initialized in the main DOMContentLoaded handler above
+        
+        function handleLogoClick() {
+            const userData = localStorage.getItem('user_data');
+            if (userData) {
                 window.location.href = '/dashboard';
-            }, 1500);
+            } else {
+                window.location.href = '/';
+            }
         }
     </script>
 </body>

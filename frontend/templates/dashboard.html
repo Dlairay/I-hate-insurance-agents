@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard - Clearcover</title>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
     <style>
         * {
@@ -13,7 +14,7 @@
         }
         
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            font-family: 'Fredoka', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             background-image: url('/static/images/background_img.png');
             background-size: cover;
             background-position: center;
@@ -39,8 +40,8 @@
         }
         
         .logo-container img {
-            height: 40px;
-            width: 40px;
+            height: 120px;
+            width: 120px;
         }
         
         .logo-text {
@@ -142,13 +143,13 @@
         
         .plan-type {
             display: inline-block;
-            padding: 0.3rem 0.8rem;
-            border-radius: 20px;
-            font-size: 0.7rem;
+            padding: 0.45rem 1.2rem;
+            border-radius: 30px;
+            font-size: 1.05rem;
             font-weight: 600;
-            margin-bottom: 0.8rem;
+            margin-bottom: 1.2rem;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.75px;
         }
         
         .plan-type.medical {
@@ -176,6 +177,12 @@
         .plan-duration {
             font-size: 0.75rem;
             color: #666;
+            margin-bottom: 0.4rem;
+        }
+        
+        .plan-id {
+            font-size: 0.7rem;
+            color: #999;
             margin-bottom: 0.8rem;
         }
         
@@ -321,7 +328,7 @@
 <body>
     <!-- Header -->
     <div class="header">
-        <div class="logo-container">
+        <div class="logo-container" onclick="handleLogoClick()" style="cursor: pointer;">
             <img src="/static/images/logo.png" alt="Clearcover">
             <span class="logo-text">Clearcover</span>
         </div>
@@ -330,7 +337,12 @@
             <input type="text" class="search-input" placeholder="Type here to search a provider...">
         </div>
         
-        <a href="/questionnaire" class="view-more-link">Reevaluate Coverage</a>
+        <div>
+            <button onclick="window.location.href='/questionnaire'" style="background: #5ECDB9; color: white; border: none; padding: 0.7rem 1.5rem; border-radius: 8px; cursor: pointer; font-size: 0.9rem; font-weight: 500; transition: all 0.3s; display: flex; align-items: center; gap: 0.5rem;" onmouseover="this.style.background='#4DB8A3'" onmouseout="this.style.background='#5ECDB9'">
+                <img src="/static/images/consultation 1.png" alt="Reevaluate Coverage" style="width: 20px; height: 20px;">
+                <span>Reevaluate Coverage</span>
+            </button>
+        </div>
     </div>
     
     <!-- Main Content -->
@@ -383,7 +395,7 @@
             <div class="claims-section">
                 <div class="claims-header">
                     <h2 class="section-title" style="margin: 0;">Claims</h2>
-                    <button class="new-claim-btn" onclick="window.location.href='/claims'">New Claim</button>
+                    <button class="new-claim-btn" onclick="window.location.href='/claims-dashboard'">View Claims</button>
                 </div>
                 
                 <div class="recent-claims">
@@ -401,6 +413,19 @@
                 </div>
             </div>
         </div>
+        
+
+        <!-- Logout Section -->
+        <div class="section" style="text-align: center; margin-top: 1rem;">
+            <button onclick="logout()" style="background: none; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem; margin: 0 auto; padding: 0.8rem 1.5rem; border-radius: 8px; transition: all 0.3s; color: #ff4444; font-size: 0.9rem; font-weight: 500;" title="Logout" onmouseover="this.style.background='rgba(255, 68, 68, 0.1)'" onmouseout="this.style.background='none'">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M9 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M16 17L21 12L16 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M21 12H9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <span>Logout</span>
+            </button>
+        </div>
     </div>
     
     <script>
@@ -408,11 +433,152 @@
         const userData = localStorage.getItem('user_data');
         if (!userData) {
             window.location.href = '/login';
+        } else {
+            loadUserDashboard();
+        }
+        
+        async function loadUserDashboard() {
+            const user = JSON.parse(userData);
+            const userId = user.email || 'demo_user'; // Use email as user ID
+            
+            // Get user's active plans from backend
+            let userPlans = [];
+            let userClaims = [];
+            
+            try {
+                // Load policies from backend
+                console.log('Attempting to load policies for user:', userId);
+                const policiesResponse = await fetch(`http://localhost:8000/v1/user/${userId}/policies`);
+                console.log('Backend response status:', policiesResponse.status);
+                
+                if (policiesResponse.ok) {
+                    const policiesData = await policiesResponse.json();
+                    userPlans = policiesData.policies || [];
+                    console.log('✅ Loaded policies from backend:', userPlans);
+                    console.log('Number of policies found:', userPlans.length);
+                } else {
+                    console.warn('❌ Failed to load policies from backend, status:', policiesResponse.status);
+                    console.log('Using localStorage fallback...');
+                    userPlans = JSON.parse(localStorage.getItem('user_plans') || '[]');
+                    console.log('localStorage policies:', userPlans);
+                }
+                
+                // Just load claims from localStorage directly
+                userClaims = JSON.parse(localStorage.getItem('user_claims') || '[]');
+                console.log('Loaded claims from localStorage:', userClaims);
+            } catch (error) {
+                console.error('❌ Error loading data from backend:', error);
+                
+                // Show warning to user with actual error
+                const warningDiv = document.createElement('div');
+                warningDiv.style.cssText = 'background: #ff6b6b; color: white; padding: 1rem; margin: 1rem; border-radius: 8px; text-align: center; font-weight: bold;';
+                warningDiv.innerHTML = `⚠️ Backend connection error: ${error.message}. Check console for details.`;
+                document.querySelector('.main-container').insertBefore(warningDiv, document.querySelector('.main-container').firstChild);
+                
+                // Fallback to localStorage
+                userPlans = JSON.parse(localStorage.getItem('user_plans') || '[]');
+                userClaims = JSON.parse(localStorage.getItem('user_claims') || '[]');
+                console.log('📁 Using localStorage fallback - policies found:', userPlans.length);
+            }
+            
+            // Update active plans section
+            const plansGrid = document.querySelector('.plans-grid');
+            if (userPlans.length === 0) {
+                plansGrid.innerHTML = `
+                    <div style="grid-column: 1/-1; text-align: center; padding: 2rem; color: #999;">
+                        <h3>No Active Plans</h3>
+                        <p>You don't have any active insurance plans yet.</p>
+                        <a href="/questionnaire" class="btn btn-primary" style="margin-top: 1rem; display: inline-block; padding: 0.8rem 2rem; background: #5ECDB9; color: white; text-decoration: none; border-radius: 8px;">Get Started</a>
+                    </div>
+                `;
+            } else {
+                plansGrid.innerHTML = userPlans.map(plan => {
+                    // Handle both backend format and localStorage format
+                    const companyName = plan.company_name || plan.company || 'Unknown';
+                    const planName = plan.plan_name || plan.type || 'Unknown Plan';
+                    const coverage = plan.coverage_amount || plan.coverage || 'Standard Coverage';
+                    const planId = plan.policy_id || plan.id || 'Unknown ID';
+                    const premium = plan.monthly_premium ? `$${plan.monthly_premium}/month` : (plan.premium || 'N/A');
+                    
+                    // Extract coverage type from plan name 
+                    const coverageType = planName.includes('Health') || planName.includes('Medical') ? 'Medical' : 
+                                       planName.includes('Dental') ? 'Dental' : 
+                                       planName.includes('Life') ? 'Life' : 'Medical';
+                    
+                    const typeClass = coverageType.toLowerCase();
+                    
+                    return `
+                        <div class="plan-card">
+                            <div>
+                                <div class="plan-type ${typeClass}">${coverageType}</div>
+                                <div class="plan-name">${companyName}</div>
+                                <div class="plan-duration">${coverage}</div>
+                                <div class="plan-id">${planId}</div>
+                            </div>
+                            <div class="plan-icons">
+                                <div class="plan-icon"></div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+            
+            // Update recent claims section
+            const claimsGrid = document.querySelector('.recent-claims');
+            if (userClaims.length === 0) {
+                claimsGrid.innerHTML = `
+                    <div style="grid-column: 1/-1; text-align: center; padding: 2rem; color: #999;">
+                        <p>No recent claims</p>
+                    </div>
+                `;
+            } else {
+                // Show only the most recent 2 claims
+                const recentClaims = userClaims.slice(-2).reverse();
+                claimsGrid.innerHTML = recentClaims.map(claim => {
+                    // Determine claim provider from type or policy
+                    const provider = claim.type === 'dental' ? 'Smile Care' : 
+                                   claim.type === 'life' ? 'Term Life' : 'Health Plus';
+                    
+                    // Determine status color
+                    const isApproved = claim.status && claim.status.toLowerCase().includes('approved');
+                    const amountClass = isApproved ? '' : 'health-amount';
+                    
+                    return `
+                        <div class="claim-card">
+                            <div class="claim-provider">${provider}</div>
+                            <div class="claim-amount ${amountClass}">$${claim.amount || 0}</div>
+                            <div class="claim-status">${claim.status || 'Pending'}</div>
+                        </div>
+                    `;
+                }).join('');
+            }
         }
         
         function viewPlanDetails(planType) {
             alert(`Viewing details for ${planType} plan`);
         }
+        
+        function logout() {
+            // Clear user data
+            localStorage.removeItem('user_data');
+            localStorage.removeItem('user_plans');
+            localStorage.removeItem('user_claims');
+            sessionStorage.clear();
+            
+            // Redirect to login page
+            window.location.href = '/login';
+        }
+        
+        function handleLogoClick() {
+            // Already on dashboard, but check if logged in
+            const userData = localStorage.getItem('user_data');
+            if (userData) {
+                window.location.href = '/dashboard';
+            } else {
+                window.location.href = '/';
+            }
+        }
+        
     </script>
 </body>
 </html>

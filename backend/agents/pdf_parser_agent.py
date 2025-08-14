@@ -51,7 +51,7 @@ if ADK_AVAILABLE:
 
 # Initialize Ollama model (following same pattern as questionnaire_agent.py)
 if ADK_AVAILABLE:
-    ollama_model = LiteLlm(model="ollama_chat/llama3:latest")
+    ollama_model = LiteLlm(model="ollama_chat/gpt-oss:20b")
 
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))

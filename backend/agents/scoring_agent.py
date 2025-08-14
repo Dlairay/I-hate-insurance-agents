@@ -17,6 +17,9 @@ import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 try:
+    import sys
+    import os
+    sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
     from insurance_backend.insurance_backend_mongo import QuotePlan
 except ImportError:
     # Fallback definition if import fails

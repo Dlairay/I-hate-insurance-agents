@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Insurance Questionnaire - Clearcover</title>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
     <style>
         * {
@@ -13,7 +14,7 @@
         }
         
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            font-family: 'Fredoka', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             background-image: url('/static/images/background_img.png');
             background-size: cover;
             background-position: center;
@@ -40,8 +41,8 @@
         }
         
         .logo-container img {
-            height: 40px;
-            width: 40px;
+            height: 120px;
+            width: 120px;
         }
         
         .logo-text {
@@ -102,7 +103,6 @@
             z-index: -1;
         }
         
-        .step.active::after,
         .step.completed::after {
             background: #5ECDB9;
         }
@@ -339,20 +339,52 @@
             background: #4DB8A3;
         }
         
+        .nav-btn.colorless {
+            background: transparent;
+            color: #666;
+            border: 1px solid #ddd;
+        }
+        
+        .nav-btn.colorless:hover {
+            background: #f5f5f5;
+            color: #333;
+        }
+        
+        .nav-btn.green {
+            background: #5ECDB9;
+            color: white;
+        }
+        
+        .nav-btn.green:hover {
+            background: #4DB8A3;
+        }
+        
         .nav-btn:disabled {
             background: #ccc;
             cursor: not-allowed;
         }
         
+        .ai-help-widget {
+            background: linear-gradient(135deg, #5ECDB9, #4A90E2) !important;
+            color: white !important;
+            font-weight: 600 !important;
+            border: none !important;
+        }
+        
+        .ai-help-widget:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(94, 205, 185, 0.3);
+        }
+        
         .back-btn {
-            background: transparent;
-            color: #666;
-            border: 2px solid #ddd;
+            background: #f8f9fa !important;
+            color: #666 !important;
+            border: 2px solid #ddd !important;
         }
         
         .back-btn:hover {
-            background: #f8f9fa;
-            color: #333;
+            background: #e9ecef !important;
+            color: #333 !important;
         }
         
         /* MCQ Screen Styles */
@@ -376,15 +408,13 @@
             background: #5ECDB9;
             color: white;
             border: none;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            border-radius: 10px !important;
+            padding: 0.75rem 1.5rem !important;
+            font-weight: 600 !important;
             cursor: pointer;
             margin-bottom: 2rem;
             transition: all 0.3s;
+            font-size: 1rem !important;
         }
         
         .back-btn:hover {
@@ -446,6 +476,150 @@
             color: #333;
             margin-bottom: 1rem;
             text-align: center;
+        }
+        
+        /* AI Help Styles */
+        .ai-help-button {
+            margin: 1rem 0;
+            text-align: center;
+        }
+        
+        .btn-help {
+            background: linear-gradient(135deg, #5ECDB9, #4A90E2);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
+        }
+        
+        .btn-help:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(94, 205, 185, 0.3);
+        }
+        
+        .ai-suggestion-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+        
+        .btn-accept {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            flex: 1;
+            font-weight: 600;
+        }
+        
+        .btn-accept:hover {
+            background: #218838;
+        }
+        
+        .btn-cancel {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            flex: 1;
+        }
+        
+        .btn-cancel:hover {
+            background: #545b62;
+        }
+        
+        .chat-message.ai-message {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+        }
+        
+        .chat-message.user-message {
+            background: #f1f8e9;
+            border-left: 4px solid #4caf50;
+            margin-left: 20px;
+        }
+        
+        .chat-message.suggestion-message {
+            background: #fff3e0;
+            border-left: 4px solid #ff9800;
+            font-weight: 600;
+        }
+        
+        /* Simple AI Help Popup */
+        .ai-help-popup {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            border-radius: 15px;
+            padding: 1.5rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            z-index: 1000;
+            width: 400px;
+            max-width: 90vw;
+        }
+        
+        .ai-popup-content h4 {
+            margin: 0 0 1rem 0;
+            color: #333;
+            text-align: center;
+        }
+        
+        .ai-popup-content input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1rem;
+            margin-bottom: 1rem;
+            box-sizing: border-box;
+        }
+        
+        .ai-popup-content input:focus {
+            outline: none;
+            border-color: #5ECDB9;
+        }
+        
+        .ai-popup-buttons {
+            display: flex;
+            gap: 0.5rem;
+        }
+        
+        .ai-popup-buttons button {
+            flex: 1;
+            padding: 0.75rem;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .ai-popup-buttons button:first-child {
+            background: #5ECDB9;
+            color: white;
+        }
+        
+        .ai-popup-buttons button:first-child:hover {
+            background: #4DB8A3;
+        }
+        
+        .ai-popup-buttons button:last-child {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .ai-popup-buttons button:last-child:hover {
+            background: #545b62;
         }
         
         .chat-messages {
@@ -528,7 +702,7 @@
 <body>
     <!-- Header -->
     <div class="header">
-        <div class="logo-container">
+        <div class="logo-container" onclick="handleLogoClick()" style="cursor: pointer;">
             <img src="/static/images/logo.png" alt="Clearcover">
             <span class="logo-text">Clearcover</span>
         </div>
@@ -618,7 +792,17 @@
                 
                 <div class="navigation-buttons">
                     <button class="nav-btn back-btn" id="backBtn" onclick="previousQuestion()" disabled>Back</button>
+                    <button class="nav-btn ai-help-btn" id="aiHelpBtn" onclick="showAIHelp()" style="display: none;">Get AI Help</button>
                     <button class="nav-btn" id="nextBtn" onclick="nextQuestion()" disabled>Next</button>
+                </div>
+                
+                <!-- AI Help Text Box (appears below buttons) -->
+                <div id="aiHelpBox" style="display: none; margin-top: 15px; padding: 15px; background: #f8f9fa; border-radius: 8px; border: 1px solid #ddd;">
+                    <input type="text" id="aiHelpInput" placeholder="Describe your situation (e.g., 'I smoke 5 cigarettes a day')" style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; margin-bottom: 10px; box-sizing: border-box;">
+                    <div style="display: flex; gap: 10px;">
+                        <button onclick="submitAIHelp()" style="background: #5ECDB9; color: white; padding: 8px 16px; border: none; border-radius: 5px; flex: 1;">Submit</button>
+                        <button onclick="closeAIHelp()" style="background: #6c757d; color: white; padding: 8px 16px; border: none; border-radius: 5px; flex: 1;">Cancel</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -628,17 +812,23 @@
             <!-- Progress Steps -->
             <div class="progress-steps">
                 <div class="step active">
-                    <div class="step-icon">📋</div>
+                    <div class="step-icon">
+                        <img src="/static/images/docs_1.png" alt="Documents">
+                    </div>
                     <div class="step-label">STEP 1<br>Upload Documents</div>
                 </div>
                 
                 <div class="step">
-                    <div class="step-icon">👤</div>
+                    <div class="step-icon">
+                        <img src="/static/images/consultation 1.png" alt="Consultation">
+                    </div>
                     <div class="step-label">STEP 2<br>Consultation</div>
                 </div>
                 
                 <div class="step">
-                    <div class="step-icon">📊</div>
+                    <div class="step-icon">
+                        <img src="/static/images/progress_bar_selection.png" alt="Choose Plan">
+                    </div>
                     <div class="step-label">STEP 3<br>Choose your plan</div>
                 </div>
             </div>
@@ -669,17 +859,23 @@
             <!-- Progress Steps -->
             <div class="progress-steps">
                 <div class="step completed">
-                    <div class="step-icon">✓</div>
+                    <div class="step-icon">
+                        <img src="/static/images/tick_3.png" alt="Completed">
+                    </div>
                     <div class="step-label">Upload Documents</div>
                 </div>
                 
                 <div class="step active">
-                    <div class="step-icon">👤</div>
+                    <div class="step-icon">
+                        <img src="/static/images/consultation 1.png" alt="Consultation">
+                    </div>
                     <div class="step-label">STEP 2<br>Consultation</div>
                 </div>
                 
                 <div class="step">
-                    <div class="step-icon">📊</div>
+                    <div class="step-icon">
+                        <img src="/static/images/progress_bar_selection.png" alt="Choose Plan">
+                    </div>
                     <div class="step-label">Choose your plan</div>
                 </div>
             </div>
@@ -693,9 +889,10 @@
                         Do you regularly participate in high-risk activities?
                     </div>
                     
-                    <div class="question-subtitle">
+                    <div class="question-subtitle" id="questionSubtitle">
                         (Feel free to reach out to chatbot on the bottom right if you need any clarifications)
                     </div>
+                    
                     
                     <div class="options" id="questionOptions">
                         <div class="option">
@@ -711,15 +908,19 @@
                 
                 <div class="chatbot-section">
                     <div class="chatbot">
-                        <div class="chatbot-header">Chatbot</div>
+                        <div class="chatbot-header" id="chatbotHeader">AI Help</div>
                         <div class="chat-messages" id="chatMessages">
-                            <div class="chat-message">
-                                How may I help you today?
+                            <div class="chat-message ai-message">
+                                Click "Get AI Help" to describe your situation and I'll suggest the best answer option!
                             </div>
                         </div>
-                        <div class="chat-input-container">
-                            <input type="text" class="chat-input" placeholder="Type something..." id="chatInput">
-                            <button class="chat-send" onclick="sendMessage()">🎤</button>
+                        <div class="chat-input-container" id="chatInputContainer">
+                            <input type="text" class="chat-input" placeholder="Describe your situation..." id="chatInput" maxlength="500">
+                            <button class="chat-send" onclick="sendAIHelpMessage()" id="chatSendButton">Send</button>
+                        </div>
+                        <div class="ai-suggestion-actions" id="aiSuggestionActions" style="display: none;">
+                            <button class="btn-accept" onclick="acceptAISuggestion()">Accept Suggestion</button>
+                            <button class="btn-cancel" onclick="resetAIHelp()">Ask Again</button>
                         </div>
                     </div>
                 </div>
@@ -788,7 +989,7 @@
                     // The start-session endpoint already returns the first question
                     if (data.current_question) {
                         console.log('DEBUG: Displaying first question:', data.current_question);
-                        displayQuestion(data.current_question);
+                        displayQuestion(data.current_question, data.progress);
                     } else {
                         console.error('No questions available in response:', data);
                     }
@@ -800,15 +1001,32 @@
             }
         }
         
-        function displayQuestion(question) {
+        function displayQuestion(question, progressData) {
             console.log('DEBUG: displayQuestion called with:', question);
+            console.log('DEBUG: Progress data:', progressData);
             
-            // Update question number and text
-            document.getElementById('questionNumber').textContent = `Question ${currentQuestionIndex + 1} of 15`;
+            
+            // Update question number and text using progress data from backend
+            if (progressData) {
+                document.getElementById('questionNumber').textContent = `Question ${progressData.current} of ${progressData.total}`;
+            } else {
+                // Fallback if no progress data
+                document.getElementById('questionNumber').textContent = `Question ${currentQuestionIndex + 1}`;
+            }
             document.getElementById('questionText').textContent = question.question_text;
             
             const optionsContainer = document.getElementById('answerOptions');
             optionsContainer.innerHTML = '';
+            
+            // Show/hide AI help button for MCQ questions
+            const aiHelpBtn = document.getElementById('aiHelpBtn');
+            const isMCQ = (question.question_type === 'MCQ_SINGLE' || question.question_type === 'mcq_single' || 
+                          question.question_type === 'MCQ_MULTIPLE' || question.question_type === 'mcq_multiple') && 
+                         question.options && question.options.length > 0;
+            
+            if (aiHelpBtn) {
+                aiHelpBtn.style.display = isMCQ ? 'inline-block' : 'none';
+            }
             
             // Handle different question types
             if ((question.question_type === 'MCQ_SINGLE' || question.question_type === 'mcq_single') && question.options && question.options.length > 0) {
@@ -865,15 +1083,43 @@
                 // Enable next button when user types
                 const textInput = inputDiv.querySelector('input');
                 textInput.addEventListener('input', () => {
-                    document.getElementById('nextBtn').disabled = !textInput.value.trim();
+                    const hasInput = textInput.value.trim();
+                    document.getElementById('nextBtn').disabled = !hasInput;
+                    updateButtonColors(hasInput);
                 });
             }
             
             // Update navigation buttons
             document.getElementById('backBtn').disabled = currentQuestionIndex === 0;
             document.getElementById('nextBtn').disabled = true;
+            
+            // Set initial button colors - no selection yet
+            updateButtonColors(false);
         }
         
+        function updateButtonColors(hasSelection) {
+            const backBtn = document.getElementById('backBtn');
+            const aiHelpBtn = document.getElementById('aiHelpBtn');
+            const nextBtn = document.getElementById('nextBtn');
+            
+            // Reset all button classes
+            backBtn.className = 'nav-btn back-btn';
+            aiHelpBtn.className = 'nav-btn ai-help-btn';
+            nextBtn.className = 'nav-btn';
+            
+            if (hasSelection) {
+                // When option is selected: next button green, others colorless
+                nextBtn.classList.add('green');
+                backBtn.classList.add('colorless');
+                aiHelpBtn.classList.add('colorless');
+            } else {
+                // When no option selected: AI help button green, others colorless
+                aiHelpBtn.classList.add('green');
+                backBtn.classList.add('colorless');
+                nextBtn.classList.add('colorless');
+            }
+        }
+
         function selectOption(optionId, optionElement) {
             // Remove selected class from all options
             document.querySelectorAll('.answer-option').forEach(opt => opt.classList.remove('selected'));
@@ -887,6 +1133,9 @@
             
             // Enable next button
             document.getElementById('nextBtn').disabled = false;
+            
+            // Update button colors - option is selected
+            updateButtonColors(true);
         }
         
         function selectMultipleOption(optionId, optionElement) {
@@ -899,7 +1148,11 @@
             
             // Enable next button if at least one option is selected
             const selectedCheckboxes = document.querySelectorAll('input[type="checkbox"]:checked');
-            document.getElementById('nextBtn').disabled = selectedCheckboxes.length === 0;
+            const hasSelection = selectedCheckboxes.length > 0;
+            document.getElementById('nextBtn').disabled = !hasSelection;
+            
+            // Update button colors
+            updateButtonColors(hasSelection);
         }
         
         async function nextQuestion() {
@@ -926,7 +1179,7 @@
                     } else if (data.next_question) {
                         // Show next question (backend handles skipping logic)
                         currentQuestionIndex++;
-                        displayQuestion(data.next_question);
+                        displayQuestion(data.next_question, data.progress);
                     } else {
                         console.error('No next question available');
                     }
@@ -938,11 +1191,33 @@
             }
         }
         
-        function previousQuestion() {
+        async function previousQuestion() {
             if (currentQuestionIndex > 0) {
-                currentQuestionIndex--;
-                // In a real implementation, you'd fetch the previous question
-                // For now, just disable the back button functionality
+                try {
+                    // Send request to backend to go back to previous question
+                    const response = await fetch(`http://localhost:8001/api/session/${currentSessionId}/previous`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        currentQuestionIndex--;
+                        
+                        if (data.previous_question) {
+                            displayQuestion(data.previous_question, data.progress);
+                        }
+                    } else {
+                        console.error('Failed to go to previous question');
+                    }
+                } catch (error) {
+                    console.error('Error going to previous question:', error);
+                    // Fallback: just decrement index
+                    currentQuestionIndex--;
+                    document.getElementById('backBtn').disabled = currentQuestionIndex === 0;
+                }
             }
         }
         
@@ -1042,12 +1317,7 @@
             }
         }
         
-        // Allow enter key to send messages
-        document.getElementById('chatInput').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                sendMessage();
-            }
-        });
+        // This is replaced by the new AI help enter handler below
         
         // Handle JSON upload (Singpass simulation)
         document.getElementById('jsonUpload').addEventListener('change', function(e) {
@@ -1063,10 +1333,8 @@
                         // Store profile data for use in session initialization
                         window.uploadedProfile = profileData;
                         
-                        alert('Profile data uploaded successfully! Proceeding to document upload.');
-                        setTimeout(() => {
-                            showUploadPdfScreen();
-                        }, 1000);
+                        // Silently proceed to document upload
+                        showUploadPdfScreen();
                     } catch (error) {
                         console.error('Error parsing JSON file:', error);
                         alert('Error parsing JSON file. Please check the file format.');
@@ -1080,12 +1348,60 @@
         document.getElementById('pdfUpload').addEventListener('change', function(e) {
             const files = e.target.files;
             if (files.length > 0) {
-                alert(`${files.length} document(s) uploaded successfully! Proceeding to consultation.`);
-                setTimeout(() => {
-                    startQuestionnaire();
-                }, 1500);
+                // Silently proceed to consultation
+                startQuestionnaire();
             }
         });
+        
+        function handleLogoClick() {
+            const userData = localStorage.getItem('user_data');
+            if (userData) {
+                window.location.href = '/dashboard';
+            } else {
+                window.location.href = '/';
+            }
+        }
+        
+        // AI Help Functions
+        function showAIHelp() {
+            document.getElementById('aiHelpBox').style.display = 'block';
+            document.getElementById('aiHelpInput').focus();
+        }
+        
+        function closeAIHelp() {
+            document.getElementById('aiHelpBox').style.display = 'none';
+            document.getElementById('aiHelpInput').value = '';
+        }
+        
+        async function submitAIHelp() {
+            const input = document.getElementById('aiHelpInput').value.trim();
+            if (!input) return;
+            
+            try {
+                const response = await fetch(`/api/session/${currentSessionId}/get-help`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        description: input
+                    })
+                });
+                
+                const data = await response.json();
+                
+                // Just select the option, nothing else
+                const radioBtn = document.querySelector(`input[value="${data.suggested_answer}"]`);
+                if (radioBtn) {
+                    radioBtn.checked = true;
+                    radioBtn.click();
+                }
+                
+                closeAIHelp();
+                
+            } catch (error) {
+                console.log('AI help failed');
+            }
+        }
+        
     </script>
 </body>
 </html>

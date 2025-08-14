@@ -14,6 +14,7 @@ import uuid
 import random
 
 from fastapi import FastAPI, HTTPException, Depends
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, validator
 from motor.motor_asyncio import AsyncIOMotorClient
 
@@ -241,6 +242,15 @@ app = FastAPI(
     title="Insurance Backend API (MongoDB)",
     description="Insurance API with MongoDB backend and multi-company support",
     version="3.0.0"
+)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # In production, specify exact origins
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
@@ -529,6 +539,46 @@ async def get_quote_from_company(company: Dict, product: Dict, request: QuoteReq
 
 
 # API Endpoints
+
+@app.post("/v1/register")
+async def register_user(user_data: Dict[str, Any]):
+    """Register a new user account"""
+    try:
+        email = user_data.get("email")
+        username = user_data.get("username", email)
+        
+        # Check if user already exists
+        existing = await async_db[Collections.CUSTOMERS].find_one({"email": email})
+        if existing:
+            return {"success": False, "message": "User already exists"}
+        
+        # Create new user
+        customer_id = f"CUST{uuid.uuid4().hex[:6].upper()}"
+        user_doc = {
+            "customer_id": customer_id,
+            "email": email,
+            "username": username,
+            "first_name": user_data.get("first_name", username),
+            "last_name": user_data.get("last_name", ""),
+            "created_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow(),
+            "purchased_policies": [],
+            "claims": []
+        }
+        
+        await async_db[Collections.CUSTOMERS].insert_one(user_doc)
+        
+        return {
+            "success": True,
+            "message": "User registered successfully",
+            "customer_id": customer_id,
+            "email": email
+        }
+        
+    except Exception as e:
+        print(f"Registration error: {e}")
+        raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
+
 @app.post("/v1/quote", response_model=QuoteResponse)
 async def create_quote(request: QuoteRequest) -> QuoteResponse:
     """Get quotes from multiple insurance companies"""

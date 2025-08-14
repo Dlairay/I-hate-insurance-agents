@@ -30,7 +30,7 @@ logging.getLogger("litellm").setLevel(logging.ERROR)
 logging.getLogger("google.adk").setLevel(logging.ERROR)
 
 # Initialize Ollama model
-ollama_model = LiteLlm(model="ollama_chat/llama3:latest")
+ollama_model = LiteLlm(model="ollama_chat/gpt-oss:20b")
 
 
 def analyze_user_profile(questionnaire_responses: dict, applicant_data: dict) -> dict:
